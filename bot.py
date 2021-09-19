@@ -33,7 +33,7 @@ id_edit_profile = 0
 show_product_id = 1
 
 
-@bot.message_handler(commands=['start', 'restart', 'help'], )
+@bot.message_handler(commands=['start', 'restart', 'help'])
 def cmd_start(message):
     if message.from_user.first_name == None:
         first_name = ""
@@ -77,6 +77,7 @@ def cmd_start(message):
 
 @bot.message_handler(content_types=["text"])
 def аccept_message(message):
+    print(message)
     global user_category
     if message.text == "📁 Каталог":
         user_category = ["1"]
@@ -100,7 +101,6 @@ def аccept_message(message):
             message.from_user.id, "Походу меня только что исправили, но сейчас уже всё ок")
         user_category = ["1"]
         cmd_start(message)
-        # do_order(message)
 
 
 def edit_profile(message):
