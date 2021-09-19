@@ -8,7 +8,7 @@ from telebot import types
 from telebot.util import user_link
 
 
-from dif_func import generate_name, categories, product, select_from_shop_db, insert_to_user_basket_db, select_from_user_basket_db, return_one_value, update_to_user_basket_db, sum_element_in_list, select_from_user_data_db, create_basket
+from dif_func import generate_name, categories, product, select_from_shop, insert_baskets, select_from_user_basket, return_one_value, update_baskets, sum_element_in_list, select_from_clients, create_basket
 from message import message
 
 
@@ -16,22 +16,21 @@ from config import TOKEN
 import sqlite3
 
 bot = telebot.TeleBot(TOKEN)
-connect = sqlite3.connect("shop.db", check_same_thread=False)
-coursor = connect.cursor()
+db = sqlite3.connect("db/shop.db", check_same_thread=False)
+cursor = db.cursor()
 
-connect_user_basket = sqlite3.connect("db/user_basket.db", check_same_thread=False)
-coursor_user_basket = connect_user_basket.cursor()
+conBaskets = sqlite3.connect("db/baskets.db", check_same_thread=False)
+curBaskets = conBaskets.cursor()
 
-connect_user_data = sqlite3.connect("db/user_data.db", check_same_thread=False)
-coursor_user_data = connect_user_data.cursor()
+conUsers = sqlite3.connect("db/clients.db", check_same_thread=False)
+curUsers = conUsers.cursor()
 
 user_category = ["1"]
 last_product = ""
 
 id_edit_profile = 0
 
-id_show_user_product_in_basket = 1
-
+show_product_id = 1
 
 
 @bot.message_handler(commands=['start', 'restart', 'help'], )
@@ -59,9 +58,9 @@ def cmd_start(message):
 
         create_basket(message)
 
-        if select_from_user_data_db("_id", "users_data", f"user_name = '{username}'") == []:
-            coursor_user_data.execute("""INSERT INTO users_data VALUES(?, ?, ?, ?, ?, ?, ?);""", (None ,user_id, username, None, None, None, None))
-            connect_user_data.commit()
+        if select_from_clients_db("_id", "clients", f"user_name = '{username}'") == []:
+            curUsers.execute("""INSERT INTO clients VALUES(?, ?, ?, ?, ?, ?, ?);""", (None ,user_id, username, None, None, None, None))
+            conUsers.commit()
     text = ""
     if message.text == "/start" or message.text == "/restart":
         text = send_mess_start
@@ -132,8 +131,8 @@ def edit_yaitsa(message):
     # data = {"ФИО":["Введите имя"], "Адрес": ["Введите адрес"], "Город":["Введите название города"], "Телефон":["Введите номер телефона"]}
     if message.text != "Назад":
         data_to_db = {"Введите свои ФИО": "fio","Введите номер телефона":"phone_number", "Введите название города": "city", "Введите адрес":"address"}
-        coursor_user_data.execute(f"""UPDATE users_data SET {data_to_db[last_bot_text]} = '{message.text}' WHERE user_id = {message.chat.id};""")
-        connect_user_data.commit()
+        curUsers.execute(f"""UPDATE clients SET {data_to_db[last_bot_text]} = '{message.text}' WHERE user_id = {message.chat.id};""")
+        conUsers.commit()
         # show_profile(message)
         edit_profile(message)
     else:
@@ -141,7 +140,7 @@ def edit_yaitsa(message):
 
 
 def show_profile(message):
-    profile = select_from_user_data_db("*", "users_data", f"user_id = '{message.chat.id}'")
+    profile = select_from_clients_db("*", "clients", f"user_id = '{message.chat.id}'")
     fio = profile[0][3] if profile[0][3] != None else "<code>не указано</code>"
     phone_number = profile[0][4] if profile[0][4] != None else "<code>не указан</code>"
     city = profile[0][5] if profile[0][5] != None else "<code>не указан</code>"
@@ -156,7 +155,7 @@ def show_profile(message):
 
 def show_basket(message):
 
-    global id_show_user_product_in_basket
+    global show_product_id
     basket = select_from_user_basket_db("*", f"user_{message.chat.id}")
     min_id = 1
     max_id = len(basket)
@@ -166,8 +165,8 @@ def show_basket(message):
         keyboardmain.add(first_button)
         bot.send_message(message.from_user.id, "В вашей корзине пусто!", reply_markup=keyboardmain)
 
-    if id_show_user_product_in_basket >= min_id and id_show_user_product_in_basket <= max_id:
-        about_product = select_from_shop_db("*", "product", f"_id = {basket[id_show_user_product_in_basket - 1][1]}")
+    if show_product_id >= min_id and show_product_id <= max_id:
+        about_product = select_from_shop_db("*", "product", f"_id = {basket[show_product_id - 1][1]}")
 
         name_parents_category_for_this_product = select_from_shop_db("title", whereis=f"_id = {about_product[0][5]}")
 
@@ -179,7 +178,7 @@ def show_basket(message):
         add = telebot.types.InlineKeyboardButton('➕', callback_data='basket_add')
 
         previos = telebot.types.InlineKeyboardButton('◀️', callback_data='basket_previos')
-        from_is = telebot.types.InlineKeyboardButton(f'{id_show_user_product_in_basket} / {len(basket)}', callback_data='a')
+        from_is = telebot.types.InlineKeyboardButton(f'{show_product_id} / {len(basket)}', callback_data='a')
         next = telebot.types.InlineKeyboardButton('▶️', callback_data='basket_next')
 
         summ = 0
@@ -194,15 +193,15 @@ def show_basket(message):
         markup.row(previos, from_is, next)
         markup.row(complite)
         markup.row(additionally)
-        caption = f"Название:\n{name_cat_pr}\nКол - во : {basket[id_show_user_product_in_basket - 1][2]} шт.\n\n{about_product[0][3]} * {basket[id_show_user_product_in_basket -1][2]} = {about_product[0][3] * basket[id_show_user_product_in_basket - 1][2]}"
+        caption = f"Название:\n{name_cat_pr}\nКол - во : {basket[show_product_id - 1][2]} шт.\n\n{about_product[0][3]} * {basket[show_product_id -1][2]} = {about_product[0][3] * basket[show_product_id - 1][2]}"
         
         img = open(about_product[0][4], 'rb')
         bot.send_photo(message.chat.id, img,caption, reply_markup=markup)
-    elif id_show_user_product_in_basket > max_id:
-        id_show_user_product_in_basket = min_id
+    elif show_product_id > max_id:
+        show_product_id = min_id
     
-    elif id_show_user_product_in_basket < min_id:
-        id_show_user_product_in_basket = max_id
+    elif show_product_id < min_id:
+        show_product_id = max_id
     
     # bot.send_message(message.chat.id, text=text)
 
@@ -214,7 +213,7 @@ def edit_basket(user_id, id_parents_categories, id_product, what_do):
         id_product = return_one_value(select_from_shop_db("_id", "product" , "title = '{}' AND id_categories = '{}'".format(title, id_parents_categories)))
     select_amount = select_from_user_basket_db("amount", "user_"+str(user_id), f"""id_product = {id_product}""")
     if select_amount == []:
-        insert_to_user_basket_db("user_"+str(user_id), None, id_product, 1)
+        insert_baskets("user_"+str(user_id), None, id_product, 1)
     else:
         amount = return_one_value(select_amount)
         if what_do != "x":
@@ -224,14 +223,14 @@ def edit_basket(user_id, id_parents_categories, id_product, what_do):
                 amount -= 1
             if amount <= 0:
                 table_name = "user_"+str(user_id)
-                coursor_user_basket.execute(f"DELETE FROM {table_name} WHERE id_product = {id_product}")
-                connect_user_basket.commit()
+                curBaskets.execute(f"DELETE FROM {table_name} WHERE id_product = {id_product}")
+                conBaskets.commit()
                 
-            update_to_user_basket_db("user_"+str(user_id), "amount", amount, f"id_product = {id_product}")
+            update_baskets("user_"+str(user_id), "amount", amount, f"id_product = {id_product}")
         else:
             table_name = "user_"+str(user_id)
-            coursor_user_basket.execute(f"DELETE FROM {table_name} WHERE id_product = {id_product}")
-            connect_user_basket.commit()
+            curBaskets.execute(f"DELETE FROM {table_name} WHERE id_product = {id_product}")
+            conBaskets.commit()
 
 
 def next_category(message):
@@ -303,31 +302,31 @@ def data(call):
             bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.id, caption=text, reply_markup=markup)
 
         elif "basket" in call.data:
-            global id_show_user_product_in_basket
+            global show_product_id
             basket = select_from_user_basket_db("*", f"user_{call.message.chat.id}")
             min_id = 1
             max_id = len(basket)
             if "next" in call.data:
-                id_show_user_product_in_basket += 1
+                show_product_id += 1
 
 
 
             elif "previos" in call.data:
-                id_show_user_product_in_basket -= 1
+                show_product_id -= 1
                     
 
 
                 
 
-            if id_show_user_product_in_basket < min_id:
-                id_show_user_product_in_basket = max_id
-            elif id_show_user_product_in_basket > max_id:
-                id_show_user_product_in_basket = min_id
+            if show_product_id < min_id:
+                show_product_id = max_id
+            elif show_product_id > max_id:
+                show_product_id = min_id
 
 
             basket = select_from_user_basket_db("*", f"user_{call.message.chat.id}")
             if basket != []:
-                about_product = select_from_shop_db("*", "product", f"_id = {basket[id_show_user_product_in_basket - 1][1]}")
+                about_product = select_from_shop_db("*", "product", f"_id = {basket[show_product_id - 1][1]}")
             min_id = 1
             max_id = len(basket)
 
@@ -349,14 +348,14 @@ def data(call):
 
             basket = select_from_user_basket_db("*", f"user_{call.message.chat.id}")
             max_id = len(basket)
-            if id_show_user_product_in_basket < min_id:
-                id_show_user_product_in_basket = max_id
-            elif id_show_user_product_in_basket > max_id:
-                id_show_user_product_in_basket = min_id
+            if show_product_id < min_id:
+                show_product_id = max_id
+            elif show_product_id > max_id:
+                show_product_id = min_id
 
 
-            if id_show_user_product_in_basket >= min_id and id_show_user_product_in_basket <= max_id:
-                about_product = select_from_shop_db("*", "product", f"_id = {basket[id_show_user_product_in_basket - 1][1]}")
+            if show_product_id >= min_id and show_product_id <= max_id:
+                about_product = select_from_shop_db("*", "product", f"_id = {basket[show_product_id - 1][1]}")
 
                 name_parents_category_for_this_product = select_from_shop_db("title", whereis=f"_id = {about_product[0][5]}")
 
@@ -368,7 +367,7 @@ def data(call):
                 add = telebot.types.InlineKeyboardButton('➕', callback_data='basket_add')
 
                 previos = telebot.types.InlineKeyboardButton('◀️', callback_data='basket_previos')
-                from_is = telebot.types.InlineKeyboardButton(f'{id_show_user_product_in_basket} / {len(basket)}', callback_data='a')
+                from_is = telebot.types.InlineKeyboardButton(f'{show_product_id} / {len(basket)}', callback_data='a')
                 next = telebot.types.InlineKeyboardButton('▶️', callback_data='basket_next')
 
                 summ = 0
@@ -383,7 +382,7 @@ def data(call):
                 markup.row(previos, from_is, next)
                 markup.row(complite)
                 markup.row(additionally)
-                caption = f"Название:\n{name_cat_pr}\nКол - во : {basket[id_show_user_product_in_basket - 1][2]} шт.\n\n{about_product[0][3]} * {basket[id_show_user_product_in_basket - 1][2]} = {about_product[0][3] * basket[id_show_user_product_in_basket - 1][2]}"
+                caption = f"Название:\n{name_cat_pr}\nКол - во : {basket[show_product_id - 1][2]} шт.\n\n{about_product[0][3]} * {basket[show_product_id - 1][2]} = {about_product[0][3] * basket[show_product_id - 1][2]}"
 
                 new_photo = open(about_product[0][4], 'rb')
                 if caption != call.message.caption:
@@ -396,7 +395,7 @@ def data(call):
             show_basket(call.message)
 
         elif call.data == "complite":
-            if None not in select_from_user_data_db("*", "users_data",whereis=f"user_id = {call.message.chat.id}")[0][2:]:
+            if None not in select_from_clients_db("*", "clients",whereis=f"user_id = {call.message.chat.id}")[0][2:]:
                 basket = select_from_user_basket_db("*", f"user_{call.message.chat.id}")
                 user_basket = ""
                 всего = 0
@@ -408,9 +407,9 @@ def data(call):
                     h = f"<code>{i[2]}</code> * <code>{name_parents_category_product[0][0]} -> {about_product[0][1]}</code>\nСтоимость: <code>{price} ₽</code>\n\n"
                     user_basket += h
                 user_basket += f"<b>Всего: {всего} ₽</b>"
-                users_data = select_from_user_data_db("*", "users_data",whereis=f"user_id = {call.message.chat.id}")[0][2:]
-                username = "@" + users_data[0]
-                message_order = f"<b>Ссылка на пользователя</b>: {username}\n<b>ФИО</b>: <i>{users_data[1]}</i>\n<b>Город</b>: <i>{users_data[3]}</i>\n<b>Адрес</b>: <i>{users_data[4]}</i>\n<b>Номер телефона</b>: <i>{users_data[2]}</i>\n\n<b>Заказ: </b>\n" + user_basket
+                clients = select_from_clients_db("*", "clients",whereis=f"user_id = {call.message.chat.id}")[0][2:]
+                username = "@" + clients[0]
+                message_order = f"<b>Ссылка на пользователя</b>: {username}\n<b>ФИО</b>: <i>{clients[1]}</i>\n<b>Город</b>: <i>{clients[3]}</i>\n<b>Адрес</b>: <i>{clients[4]}</i>\n<b>Номер телефона</b>: <i>{clients[2]}</i>\n\n<b>Заказ: </b>\n" + user_basket
 
                 bot.send_message(850731060, message_order,  parse_mode='html')
                 new_photo = open("photo/complite.png", 'rb')
@@ -418,8 +417,8 @@ def data(call):
                 markup.add(types.KeyboardButton(text="⏺В главное меню"))
                 bot.edit_message_media(media=telebot.types.InputMedia(type='photo', media=new_photo, caption = "Заказ оформлен, скоро с вами свяжется менеджер для отправки вам кода отслеживания"), chat_id=call.message.chat.id, message_id=call.message.message_id)#, reply_markup=markup)
                 tablename = "user_" + str(call.message.chat.id)
-                coursor_user_basket.execute(f"""DELETE FROM {tablename}""")
-                connect_user_basket.commit()
+                curBaskets.execute(f"""DELETE FROM {tablename}""")
+                conBaskets.commit()
                 # bot.send_message(call.message.chat.id, "Заказ оформлен, скоро с вами свяжется менеджер для отправки вам кода отслеживания")
             else:
                 markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
