@@ -35,7 +35,8 @@ def categories(user_category=1):
 
     # else:
     return list_categories
-    
+
+
 def product(user_category):
     cursor.execute("""
     SELECT title FROM product WHERE nodelete = 1 AND id_categories = {}
@@ -48,26 +49,35 @@ def product(user_category):
     user_product = True
     return list_product
 
-def select_from_shop(whatis="*",fromis="categories" ,whereis=''):
-    cursor.execute("""SELECT {} FROM '{}' WHERE {};""".format(whatis, fromis, whereis))
+
+def select_from_shop(whatis="*", fromis="categories", whereis=''):
+    cursor.execute("""SELECT {} FROM '{}' WHERE {};""".format(
+        whatis, fromis, whereis))
     return cursor.fetchall()
 
-def select_from_baskets(whatis="*",fromis="baskets" ,whereis=''):
+
+def select_from_baskets(whatis="*", fromis="baskets", whereis=''):
     if whereis == "":
         curBaskets.execute("""SELECT {} FROM '{}';""".format(whatis, fromis))
     else:
-        curBaskets.execute("""SELECT {} FROM '{}' WHERE {};""".format(whatis, fromis, whereis))
+        curBaskets.execute(
+            """SELECT {} FROM '{}' WHERE {};""".format(whatis, fromis, whereis))
     return curBaskets.fetchall()
+
 
 def insert_baskets(name_table, *values_for_paste):
     amount_values = len(values_for_paste)
     _vars = ("? ," * amount_values)[:-2]
-    curBaskets.execute(f"""INSERT INTO {name_table} VALUES({_vars});""", values_for_paste)
+    curBaskets.execute(
+        f"""INSERT INTO {name_table} VALUES({_vars});""", values_for_paste)
     conBaskets.commit()
 
+
 def update_baskets(name_table, column, value, whereis):
-    curBaskets.execute(f"""UPDATE {name_table} SET {column} = {value} WHERE {whereis};""")
+    curBaskets.execute(
+        f"""UPDATE {name_table} SET {column} = {value} WHERE {whereis};""")
     conBaskets.commit()
+
 
 def create_basket(message):
     from datetime import datetime
@@ -82,24 +92,25 @@ def create_basket(message):
         amount INTEGER
     );""")
     if select_from_baskets("_id", "baskets", "username = '{}'".format(username)) == []:
-        curBaskets.execute(f"""INSERT INTO baskets VALUES(?, ?, ?, ?);""", (None ,username,user_id, dt_created))
+        curBaskets.execute(f"""INSERT INTO baskets VALUES(?, ?, ?, ?);""",
+                           (None, username, user_id, dt_created))
         conBaskets.commit()
 
 
-def select_from_clients(whatis="*",fromis="clients" ,whereis=''):
+def select_from_clients(whatis="*", fromis="clients", whereis=''):
     if whereis == "":
         curUsers.execute("""SELECT {} FROM '{}';""".format(whatis, fromis))
     else:
-        curUsers.execute("""SELECT {} FROM '{}' WHERE {};""".format(whatis, fromis, whereis))
+        curUsers.execute("""SELECT {} FROM '{}' WHERE {};""".format(
+            whatis, fromis, whereis))
     return curUsers.fetchall()
-
-
 
 
 def return_one_value(t):
     for i in t:
         for l in i:
             return l
+
 
 def sum_element_in_list(_list):
     _str = ""
