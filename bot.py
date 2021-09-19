@@ -8,7 +8,7 @@ from telebot import types
 from telebot.util import user_link
 
 
-from dif_func import generate_name, categories, product, select_from_shop, insert_baskets, select_from_user_basket, return_one_value, update_baskets, sum_element_in_list, select_from_clients, create_basket
+from helper import *
 from message import message
 
 
@@ -33,7 +33,7 @@ id_edit_profile = 0
 show_product_id = 1
 
 
-@bot.message_handler(commands=['start', 'restart', 'help'], )
+@bot.message_handler(commands=['start', 'restart', 'help'])
 def cmd_start(message):
     if message.from_user.first_name == None:
         first_name = ""
