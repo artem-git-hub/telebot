@@ -20,6 +20,7 @@ show_product_id = 1
 
 last_message = []
 
+
 @bot.message_handler(commands=['start', 'restart', 'help'])
 def cmd_start(msg):
     if msg.from_user.first_name is None:
@@ -123,12 +124,11 @@ last_bot_text = ""
 def edit_cat_profile(message):
     global last_bot_text
     if message.text != "Назад":
-        data_to_db = {"Введите свои ФИО": "fio", "Введите номер телефона": "phone_number",
+        data_to_db = {"Введите свои ФИО": "fio", "Введите номер телефона": "phone",
                       "Введите название города": "city", "Введите адрес": "address"}
         cursor.execute(
             f"""UPDATE clients SET {data_to_db[last_bot_text]} = '{message.text}' WHERE user_id = {message.chat.id};""")
         db.commit()
-        # show_profile(message)
         edit_profile(message)
     else:
         edit_profile(message)
@@ -376,7 +376,6 @@ def data(call):
             elif "clear" in call.data:
                 edit_basket(call.message.chat.id, 0, about_product[0][0], "x")
 
-
             basket = select_db(
                 "*", "baskets", f"user_id = {call.message.chat.id}")
             max_id = len(basket)
@@ -413,37 +412,39 @@ def data(call):
             show_basket(call.message)
 
         elif call.data == "complete":
-            if None not in select_from_clients_db("*", "clients", whereis=f"user_id = {call.message.chat.id}")[0][2:]:
+            if None not in select_db("*", "clients", whereis=f"user_id = {call.message.chat.id}")[0][2:]:
                 basket = select_db(
                     "*", "baskets", f"user_id = {call.message.chat.id}")
                 user_basket = ""
                 all = 0
                 for i in basket:
                     about_product = select_from_shop(
-                        "*", "product", f"_id = {i[1]}")
+                        "*", "product", f"_id = {i[2]}")
                     name_parents_category_product = select_from_shop(
                         "title", whereis=f"_id = {about_product[0][5]}")
-                    price = about_product[0][3] * i[2]
+                    price = about_product[0][3] * i[3]
                     all += price
-                    h = f"<code>{i[2]}</code> * <code>{name_parents_category_product[0][0]} -> {about_product[0][1]}</code>\nСтоимость: <code>{price} ₽</code>\n\n"
+                    h = f"<code>{i[3]}</code> X <code>{name_parents_category_product[0][0]} -> {about_product[0][1]}</code>\nСтоимость: <code>{price} ₽</code>\n\n"
                     user_basket += h
                 user_basket += f"<b>Всего: {all} ₽</b>"
-                clients = select_from_clients_db(
+                clients = select_db(
                     "*", "clients", whereis=f"user_id = {call.message.chat.id}")[0][2:]
                 username = "@" + clients[0]
                 message_order = f"<b>Ссылка на пользователя</b>: {username}\n<b>ФИО</b>: <i>{clients[1]}</i>\n<b>Город</b>: <i>{clients[3]}</i>\n<b>Адрес</b>: <i>{clients[4]}</i>\n<b>Номер телефона</b>: <i>{clients[2]}</i>\n\n<b>Заказ: </b>\n" + user_basket
 
-                bot.send_message(850731060, message_order, parse_mode='html')
+                from manager_bot import send_order
+                send_order(message_order)
                 new_photo = open("photo/complete.png", 'rb')
                 markup = types.ReplyKeyboardMarkup(
                     row_width=2, resize_keyboard=True)
                 markup.add(types.KeyboardButton(text="⏺В главное меню"))
                 bot.edit_message_media(media=types.InputMedia(type='photo', media=new_photo,
-                                                              caption="Заказ оформлен, скоро с вами свяжется менеджер для отправки вам кода отслеживания"),
+                                                              caption="Заказ оформлен, скоро с вами свяжется менеджер "
+                                                                      "для отправки вам кода отслеживания"),
                                        chat_id=call.message.chat.id,
                                        message_id=call.message.message_id)  # , reply_markup=markup)
                 tablename = "user_" + str(call.message.chat.id)
-                cursor.execute(f"""DELETE FROM {tablename}""")
+                cursor.execute(f"""DELETE FROM baskets WHERE user_id={call.message.chat.id}""")
                 db.commit()
                 # bot.send_message(call.message.chat.id, "Заказ оформлен, скоро с вами свяжется менеджер для отправки вам кода отслеживания")
             else:
