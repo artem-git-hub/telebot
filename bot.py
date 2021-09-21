@@ -1,34 +1,11 @@
 import sqlite3
 
-from os import name
-from typing import Counter, Text
-
 import telebot
 from telebot import types
-from telebot.util import user_link
 
 from config import TOKEN
-from helper import select_db, sum_element_in_list, return_one_value, create_basket, insert_db, update_db, categories, \
+from helper import select_db, sum_element_in_list, return_one_value, insert_db, update_db, categories, \
     product, select_from_shop
-
-import logging
-import sys
-
-logger = logging.getLogger()
-logger.setLevel(logging.ERROR)
-formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s',
-                              '%m-%d-%Y %H:%M:%S')
-
-stdout_handler = logging.StreamHandler(sys.stdout)
-stdout_handler.setLevel(logging.DEBUG)
-stdout_handler.setFormatter(formatter)
-
-file_handler = logging.FileHandler('logs.log')
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(formatter)
-
-logger.addHandler(file_handler)
-logger.addHandler(stdout_handler)
 
 bot = telebot.TeleBot(TOKEN)
 db = sqlite3.connect("db/shop.db", check_same_thread=False)
@@ -41,6 +18,7 @@ id_edit_profile = 0
 
 show_product_id = 1
 
+last_message = []
 
 @bot.message_handler(commands=['start', 'restart', 'help'])
 def cmd_start(msg):
@@ -57,12 +35,12 @@ def cmd_start(msg):
 
     send_mess_start = "Привет " + first_name + last_name + \
                       " 👋\nНажми пожалуйста на кнопку ниже, ну или напиши : <code>📁 Каталог</code>"
-    keyboarding = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    keyboarmarkup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     first_button = types.KeyboardButton(text="📁 Каталог")
     second_button = types.KeyboardButton(text="🛍 Корзина")
     third_button = types.KeyboardButton(text="👩‍🦽 Профиль")
     fourth_button = types.KeyboardButton(text="🅰️🅱️🅾️🅱️🅰️")
-    keyboarding.add(first_button, second_button, third_button, fourth_button)
+    keyboarmarkup.add(first_button, second_button, third_button, fourth_button)
     if msg.text == "/start" or "/restart":
         user_id = str(msg.chat.id)
         username = msg.from_user.username
@@ -83,12 +61,11 @@ def cmd_start(msg):
     else:
         text = "Ну чтож продолжим"
     bot.send_message(msg.from_user.id, text,
-                     reply_markup=keyboarding, parse_mode='html')
+                     reply_markup=keyboarmarkup, parse_mode='html')
 
 
 @bot.message_handler(content_types=["text"])
 def accept_message(msg):
-    print(msg)
     global user_category
     if msg.text == "📁 Каталог":
         user_category = ["1"]
@@ -187,7 +164,7 @@ def show_basket(message):
 
     if minimum <= show_product_id <= max_id:
         aboutproduct = select_db(
-            "*", "product", f"_id = {basket[show_product_id - 1][1]}")
+            "*", "product", f"_id = {basket[show_product_id - 1][2]}")
 
         name_parents_category_for_this_product = select_db(
             "title", "categories", f"_id = {aboutproduct[0][5]}")
@@ -196,29 +173,15 @@ def show_basket(message):
             aboutproduct[0][1])
 
         markup = types.InlineKeyboardMarkup(row_width=1)
-        clear = types.InlineKeyboardButton(
-            '✖️', callback_data='basket_clear')
-        remove = types.InlineKeyboardButton(
-            '➖', callback_data='basket_remove')
-        add = types.InlineKeyboardButton(
-            '➕', callback_data='basket_add')
-
-        previous = types.InlineKeyboardButton(
-            '◀️', callback_data='basket_previous')
-        from_is = types.InlineKeyboardButton(
-            f'{show_product_id} / {len(basket)}', callback_data='a')
-        next = types.InlineKeyboardButton(
-            '▶️', callback_data='basket_next')
 
         summ = 0
         for i in basket:
-            summ += i[2] * \
-                    select_db("*", "product", f"_id = {i[1]}")[0][3]
+            summ += i[3] * select_db("*", "product", f"_id = {i[2]}")[0][3]
 
-        caption = f"Название:\n{name_cat_pr}\nКол - во : {basket[show_product_id - 1][2]} шт.\n\n{aboutproduct[0][3]} * {basket[show_product_id - 1][2]} = {aboutproduct[0][3] * basket[show_product_id - 1][2]} "
+        caption = f"Название:\n{name_cat_pr}\nКол - во : {basket[show_product_id - 1][3]} шт.\n\n{aboutproduct[0][3]} * {basket[show_product_id - 1][3]} = {aboutproduct[0][3] * basket[show_product_id - 1][3]} "
 
         img = open(aboutproduct[0][4], 'rb')
-        bot.send_photo(message.chat.id, img, caption, reply_markup=button_basket())
+        bot.send_photo(message.chat.id, img, caption, reply_markup=button_basket(summ, show_product_id, basket))
     elif show_product_id > max_id:
         show_product_id = minimum
 
@@ -228,7 +191,20 @@ def show_basket(message):
     # bot.send_message(message.chat.id, text=text)
 
 
-def button_basket():
+def button_basket(summ, show_product_id, basket):
+    clear = types.InlineKeyboardButton(
+        '✖️', callback_data='basket_clear')
+    remove = types.InlineKeyboardButton(
+        '➖', callback_data='basket_remove')
+    add = types.InlineKeyboardButton(
+        '➕', callback_data='basket_add')
+
+    previous = types.InlineKeyboardButton(
+        '◀️', callback_data='basket_previous')
+    from_is = types.InlineKeyboardButton(
+        f'{show_product_id} / {len(basket)}', callback_data='a')
+    next = types.InlineKeyboardButton(
+        '▶️', callback_data='basket_next')
     markup = types.InlineKeyboardMarkup(row_width=1)
     complete = types.InlineKeyboardButton(
         f'Сделать заказ на {summ} ₽', callback_data='complete')
@@ -246,31 +222,29 @@ def edit_basket(user_id, id_parents_categories, id_product, what_do):
     global last_product
     title = last_product
     if id_product == 0:
-        id_product = return_one_value(select_db(
-            "_id", "product", "title = '{}' AND id_categories = '{}'".format(title, id_parents_categories)))
-    select_amount = select_db(
-        "amount", "baskets", f"""product_id = {id_product} AND user_id = {user_id}""")
-    if not select_amount:
-        insert_db("baskets", None, id_product, 1)
+        id_product = return_one_value(
+            select_db("_id", "product", "title = '{}' AND id_categories = '{}'".format(title, id_parents_categories)))
+    select_amount = return_one_value(
+        select_db("amount", "baskets", f"""product_id = {id_product} AND user_id = {user_id}"""))
+    if select_amount is None:
+        insert_db("baskets", None, user_id, id_product, 1)
     else:
-        amount = return_one_value(select_amount)
+        amount = select_amount
         if what_do != "x":
             if what_do == "+":
                 amount += 1
             elif what_do == "-":
                 amount -= 1
+            update_db("baskets", "amount", amount, f"product_id = {id_product} AND user_id = {user_id};")
             if amount <= 0:
-                table_name = "user_" + str(user_id)
                 cursor.execute(
                     f"""DELETE FROM baskets WHERE product_id = {id_product} AND user_id = {user_id};""")
                 db.commit()
 
-            update_db("baskets", "amount",
-                      amount, f"id_product = {id_product} AND user_id = {user_id};")
         else:
-            curBaskets.execute(
+            cursor.execute(
                 f"""DELETE FROM baskets WHERE product_id = {id_product} AND user_id = {user_id};""")
-            conBaskets.commit()
+            db.commit()
 
 
 def next_category(message):
@@ -291,9 +265,14 @@ def next_category(message):
 
 
 def show_product(message):
-    if message.text != "< Назад" and message.text != "⏺В главное меню" and message.text != "Заполнить профиль":
+    if message.text != "< Назад" and message.text != "⏺В главное меню" and message.text != "Заполнить профиль" and message.text != "📁 Каталог":
         global user_category
         global last_product
+        global last_message
+        last_message.append(message.text)
+        if len(last_message) > 1:
+            bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
+
         last_product = message.text
 
         use_user_category = int(sum_element_in_list(user_category)[-1])
@@ -322,6 +301,7 @@ def show_product(message):
         item2 = types.InlineKeyboardButton(
             "🛍 Корзина", callback_data="go to basket")
         markup.add(item2, item3)
+        text = "Выбирай категорию"
         bot.send_photo(message.from_user.id, img, caption, reply_markup=markup)
         bot.register_next_step_handler(message, show_product)
     else:
@@ -331,10 +311,9 @@ def show_product(message):
 @bot.callback_query_handler(func=lambda call: True)
 def data(call):
     if call.message:
-        global user_category
+        global user_category, keyboarding
         if call.data == "add":
-            edit_basket(call.message.chat.id, int(
-                sum_element_in_list(user_category)[-1]), 0, "+")
+            edit_basket(call.message.chat.id, int(sum_element_in_list(user_category)[-1]), 0, "+")
 
             global last_product
             title = last_product
@@ -347,10 +326,10 @@ def data(call):
                 "🛍 Корзина", callback_data="go to basket")
             markup.add(item2, item3)
             id_product = return_one_value(
-                select_from_shop("_id", "product", "title = '{}' AND id_categories = '{}'".format(
-                    title, int(sum_element_in_list(user_category)[-1]))))
+                select_from_shop("_id", "product",
+                                 f"""title = '{title}' AND id_categories = {int(sum_element_in_list(user_category)[-1])}"""))
             amount = return_one_value(select_db(
-                "amount", "user_" + str(call.message.chat.id), f"""id_product = {id_product}"""))
+                "amount", "baskets", f"""product_id = {id_product} AND user_id = {call.message.chat.id}"""))
             all_about_product = []
             for i in select_from_shop("*", "product", "title = '{}' AND id_categories = '{}'".format(title,
                                                                                                      int(
@@ -384,22 +363,12 @@ def data(call):
                 "*", "baskets", f"user_id = {call.message.chat.id}")
             if basket:
                 about_product = select_from_shop(
-                    "*", "product", f"_id = {basket[show_product_id - 1][1]}")
+                    "*", "product", f"_id = {basket[show_product_id - 1][2]}")
             minimum_id = 1
             max_id = len(basket)
 
-            basket = select_db(
-                "*", "baskets", f"user_id = {call.message.chat.id}")
-            if not basket:
-                keyboarding = types.ReplyKeyboardMarkup(
-                    row_width=2, resize_keyboard=True)
-                first_button = types.KeyboardButton(text="📁 Каталог")
-                keyboarding.add(first_button)
-                bot.delete_message(call.message.chat.id,
-                                   call.message.message_id)
-                bot.send_message(
-                    call.message.chat.id, "В вашей корзине **пусто** !", reply_markup=keyboarding)
-                return
+            basket = select_db("*", "baskets", f"user_id = {call.message.chat.id}")
+            basket_ar(basket, call.message)
             if "add" in call.data:
                 edit_basket(call.message.chat.id, 0, about_product[0][0], "+")
             elif "remove" in call.data:
@@ -407,37 +376,38 @@ def data(call):
             elif "clear" in call.data:
                 edit_basket(call.message.chat.id, 0, about_product[0][0], "x")
 
+
             basket = select_db(
                 "*", "baskets", f"user_id = {call.message.chat.id}")
             max_id = len(basket)
+            basket_ar(basket, call.message)
             if show_product_id < minimum_id:
                 show_product_id = max_id
             elif show_product_id > max_id:
                 show_product_id = minimum_id
 
             if minimum_id <= show_product_id <= max_id:
-                about_product = select_from_shop(
-                    "*", "product", f"_id = {basket[show_product_id - 1][1]}")
-
+                about_product = select_db(
+                    "*", "product", f"_id = {basket[show_product_id - 1][2]}")
                 name_parents_category_for_this_product = select_from_shop(
-                    "title", whereis=f"_id = {about_product[0][5]}")
+                    "title", "categories", f"_id = {about_product[0][5]}")
 
                 name_cat_pr = name_parents_category_for_this_product[0][0] + " -> " + str(
                     about_product[0][1])
 
                 summ = 0
                 for i in basket:
-                    summ += i[2] * \
-                            select_from_shop(
-                                "*", "product", f"_id = {i[1]}")[0][3]
+                    summ += i[3] * select_from_shop(
+                        "*", "product", f"_id = {i[2]}")[0][3]
 
-                caption = f"Название:\n{name_cat_pr}\nКол - во : {basket[show_product_id - 1][2]} шт.\n\n{about_product[0][3]} * {basket[show_product_id - 1][2]} = {about_product[0][3] * basket[show_product_id - 1][2]}"
+                caption = f"Название:\n{name_cat_pr}\nКол - во : {basket[show_product_id - 1][3]} шт.\n\n{about_product[0][3]} * {basket[show_product_id - 1][3]} = {about_product[0][3] * basket[show_product_id - 1][3]}"
 
                 new_photo = open(about_product[0][4], 'rb')
                 if caption != call.message.caption:
                     bot.edit_message_media(
                         media=types.InputMedia(type='photo', media=new_photo, caption=caption),
-                        chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=button_basket())
+                        chat_id=call.message.chat.id, message_id=call.message.message_id,
+                        reply_markup=button_basket(summ, show_product_id, basket))
 
         elif call.data == "go to basket":
             show_basket(call.message)
@@ -473,8 +443,8 @@ def data(call):
                                        chat_id=call.message.chat.id,
                                        message_id=call.message.message_id)  # , reply_markup=markup)
                 tablename = "user_" + str(call.message.chat.id)
-                curBaskets.execute(f"""DELETE FROM {tablename}""")
-                conBaskets.commit()
+                cursor.execute(f"""DELETE FROM {tablename}""")
+                db.commit()
                 # bot.send_message(call.message.chat.id, "Заказ оформлен, скоро с вами свяжется менеджер для отправки вам кода отслеживания")
             else:
                 markup = types.ReplyKeyboardMarkup(
@@ -490,6 +460,19 @@ def data(call):
             keyboarding.add(first_button)
             bot.send_message(call.message.chat.id,
                              "Тогда давай сначала", reply_markup=keyboarding)
+
+
+def basket_ar(basket, message):
+    if not basket:
+        keyboarding = types.ReplyKeyboardMarkup(
+            row_width=2, resize_keyboard=True)
+        first_button = types.KeyboardButton(text="📁 Каталог")
+        keyboarding.add(first_button)
+        bot.delete_message(message.chat.id,
+                           message.message_id)
+        bot.send_message(
+            message.chat.id, "В вашей корзине **пусто** !", reply_markup=keyboarding)
+        return
 
 
 def do_order(message):

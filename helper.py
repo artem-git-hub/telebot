@@ -38,17 +38,17 @@ def product(user_category):
 
 
 def select_from_shop(whatis="*", fromis="categories", whereis=''):
-    cursor.execute("""SELECT {} FROM '{}' WHERE {};""".format(
+    cursor.execute("""SELECT {} FROM {} WHERE {};""".format(
         whatis, fromis, whereis))
     return cursor.fetchall()
 
 
 def select_db(whatis="*", fromis="baskets", whereis=''):
     if whereis == "":
-        cursor.execute("""SELECT {} FROM '{}';""".format(whatis, fromis))
+        cursor.execute("""SELECT {} FROM {};""".format(whatis, fromis))
     else:
         cursor.execute(
-            """SELECT {} FROM '{}' WHERE {};""".format(whatis, fromis, whereis))
+            """SELECT {} FROM {} WHERE {};""".format(whatis, fromis, whereis))
     return cursor.fetchall()
 
 
@@ -61,8 +61,9 @@ def insert_db(name_table, *values_for_paste):
 
 
 def update_db(name_table, column, value, whereis):
+    # print(f"""UPDATE {name_table} SET {column} = {value} WHERE {whereis};""")
     cursor.execute(
-        f"""UPDATE {name_table} SET {column} = {value} WHERE {whereis};""")
+        f"""UPDATE {name_table} SET {column} = {value} WHERE {whereis}""")
     db.commit()
 
 
