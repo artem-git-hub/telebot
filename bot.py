@@ -37,10 +37,12 @@ show_product_id = 1
 
 messagebot = 0
 
+
 class redactor:
     type = "user"
     access = "no"
     operation = "no"
+    road = ["1"]
 
 
 def delete_message():
@@ -123,7 +125,7 @@ def accept_message(message):
         cmd_start(message)
     else:
         bot.send_message(
-            message.from_user.id, "Походу меня только что исправили, но сейчас уже всё ок")
+            message.from_user.id, "Походу меня только что исправили ну или ты что-то не то нажал,\nно сейчас уже всё ок")
         user_road = ["1"]
         cmd_start(message)
 
@@ -178,7 +180,7 @@ def super_menu(message):
     if redactor.operation == "show":
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
         for i in list(range(len(buttons)))[::2]:
-            markup.row(types.KeyboardButton(buttons[i]), types.KeyboardButton(buttons[i+1]))
+            markup.row(types.KeyboardButton(buttons[i]), types.KeyboardButton(buttons[i + 1]))
         bot.send_message(message.from_user.id, "Привет\nВыбирай что изменить", reply_markup=markup)
         bot.register_next_step_handler(message, super_menu)
         redactor.operation = "edit"
@@ -186,6 +188,37 @@ def super_menu(message):
         if message.text in buttons:
             if message.text == buttons[0]:
                 global user_road
+                user_road = ["1"]
+                do_order(message)
+                # markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
+                # user_category = int(redactor.road[-1])
+                #
+                # but = categories(user_category)
+                # if but:
+                #     for i in but:
+                #         button_name = types.KeyboardButton(i)
+                #         markup.add(button_name)
+                #     if int(sum_element_in_list(user_road)) > 1:
+                #         markup.add("⏺В главное меню", "< Назад")
+                #     else:
+                #         markup.add("⏺В главное меню")
+                #     # bot.send_message(
+                #     #     message.from_user.id, "Отлично, нажимай на нужную категорию", reply_markup=markup)
+                #     # bot.register_next_step_handler(message, next_category)
+                # else:
+                #     for i in product(user_category):
+                #         button_name = types.KeyboardButton(i)
+                #         markup.add(button_name)
+                #     markup.add("⏺В главное меню", "< Назад")
+                #     # markup.add("< Назад")
+                #     # bot.send_message(message.from_user.id,
+                #     #                  "Отлично, выбери продукт", reply_markup=markup)
+                #     # bot.register_next_step_handler(message, show_product)
+                #
+                #
+                #
+
+
 
             elif message.text == buttons[1]:
                 pass
@@ -362,33 +395,17 @@ except Exception:
     pass
 
 
-def next_category(message):
-    global user_road
-    user_category = int(sum_element_in_list(user_road)[-1])
-    if categories(user_category):
-        list_fo_check = categories(user_category)
-        if int(sum_element_in_list(user_road)) < 2:
-            list_fo_check.append("📁 Каталог")
-        if message.text in list_fo_check:
-            user_category = int(sum_element_in_list(user_road)[-1])
-            user_road.append(str(return_one_value(select_db(
-                "_id", "categories",
-                "title = '{}' AND parents_categories = '{}'".format(message.text, user_category)))))
-            do_order(message)
-        else:
-            accept_message(message)
-
-
 def show_product(message):
-    if message.text != "< Назад" and message.text != "⏺В главное меню" and message.text != "Заполнить профиль" and message.text != "📁 Каталог":
-        global user_road
+    # if message.text != "< Назад" and message.text != "⏺В главное меню" and message.text != "Заполнить профиль" and message.text != "📁 Каталог":
+    global user_road
+    user_category = int(user_road[-1])
+    if message.text in product(user_category=user_category):
         global last_product
 
         # last_message.append(message.message_id + 1)
         check_and_delete(message)
         last_product = message.text
 
-        user_category = int(sum_element_in_list(user_road)[-1])
         all_about_product = []
         for i in select_db("*", "product",
                            "title = '{}' AND id_categories = '{}'".format(message.text, user_category)):
@@ -397,7 +414,7 @@ def show_product(message):
         img = open(all_about_product[4], 'rb')
         id_product = return_one_value(
             select_db("_id", "product", "title = '{}' AND id_categories = '{}'".format(
-                message.text, int(sum_element_in_list(user_road)[-1]))))
+                message.text, int(user_road[-1]))))
         amount_product = return_one_value(select_db(
             "amount", "baskets", f"""product_id = {id_product} AND user_id = {message.from_user.id}"""))
 
@@ -428,7 +445,7 @@ def data(call):
     if "me" in call.data:
         pass
     elif call.data == "add":
-        edit_basket(call.message.chat.id, int(sum_element_in_list(user_road)[-1]), 0, "+")
+        edit_basket(call.message.chat.id, int(user_road[-1]), 0, "+")
 
         global last_product
         title = last_product
@@ -442,14 +459,13 @@ def data(call):
         markup.add(item2, item3)
         id_product = return_one_value(
             select_db("_id", "product",
-                      f"""title = '{title}' AND id_categories = {int(sum_element_in_list(user_road)[-1])}"""))
+                      f"""title = '{title}' AND id_categories = {int(user_road[-1])}"""))
         amount = return_one_value(select_db(
             "amount", "baskets", f"""product_id = {id_product} AND user_id = {call.message.chat.id}"""))
         all_about_product = []
         for i in select_db("*", "product", "title = '{}' AND id_categories = '{}'".format(title,
                                                                                           int(
-                                                                                              sum_element_in_list(
-                                                                                                  user_road)[
+                                                                                              user_road[
                                                                                                   -1]))):
             all_about_product = list(i)
         text = """Название: {}\nЦена: {} ₽\nОписание:\n{}\n\nКол-во в корзине: {}""".format(
@@ -591,13 +607,93 @@ def basket_ar(basket, message):
         return
 
 
+def add_category(message):
+    global user_road
+    insert_db("categories", None, message.text, 1, int(user_road[-1]))
+    do_order(message)
+
+
+# требуется только для переименовки диракторий
+id_cat = 0
+
+
+def rename_category(message):
+    try:
+        global user_road
+        global id_cat
+        id_cat = select_db("_id", "categories", f"parents_categories = {int(user_road[-1])}")[int(message.text) - 1][0]
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.add("Отмена")
+        bot.send_message(message.from_user.id, "Введи новое название", reply_markup=markup)
+        bot.register_next_step_handler(message, update_name_cat)
+    except Exception as e:
+        print(e)
+        do_order(message)
+
+def update_name_cat(message):
+    if message.text != "Отмена":
+        global id_cat
+        update_db("categories", "title", f"'{message.text}'", f"_id = {id_cat}")
+        do_order(message)
+    else:
+        do_order(message)
+
+
+def delete_category(message):
+    try:
+        global user_road
+
+        id_cat = select_db("_id", "categories", f"parents_categories = {int(user_road[-1])}")[int(message.text) - 1][0]
+        print(id_cat)
+        # cursor.execute(f"""DELETE FROM categories where _id = {id_cat}""")
+        update_db("categories", "nodelete", 0, f"_id = {id_cat}")
+        do_order(message)
+    except Exception as e:
+        print(e)
+        do_order(message)
+
+
+def next_category(message):
+    global user_road
+    user_category = int(user_road[-1])
+    if categories(user_category) != []:
+        list_fo_check = categories(user_category)
+        if int(sum_element_in_list(user_road)) < 2:
+            list_fo_check.append("📁 Каталог")
+        if message.text in list_fo_check:
+            user_category = int(user_road[-1])
+            user_road.append(str(return_one_value(select_db(
+                "_id", "categories",
+                "title = '{}' AND parents_categories = '{}'".format(message.text, user_category)))))
+            do_order(message)
+        elif message.text == "Добавить\nкатегорию":
+            # markup = types.ReplyKeyboardMarkup(resize_keyboard=)
+            bot.send_message(message.chat.id, "Введите название категории")
+            bot.register_next_step_handler(message, add_category)
+        elif message.text == "Переименовать\nкатегорию":
+            text = "Введите номер чтобы переименовать: "
+            for i in list_fo_check[:-1]:
+                _str = f"\n>> {list_fo_check.index(i) + 1} << - {i}"
+                text += _str
+            bot.send_message(message.from_user.id, text)
+            bot.register_next_step_handler(message, rename_category)
+        elif message.text == "Удалить\nкатегорию":
+            text = "Введите номер чтобы удалить: "
+            for i in list_fo_check[:-1]:
+                _str = f"\n<< {list_fo_check.index(i) + 1} >> - {i}"
+                text += _str
+            bot.send_message(message.from_user.id, text)
+            bot.register_next_step_handler(message, delete_category)
+        else:
+            accept_message(message)
+
+
 def do_order(message):
     global user_road
     try:
-        user_category = int(sum_element_in_list(
-            sum_element_in_list(user_road)[-1]))
+        user_category = int(user_road[-1])
 
-        markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+        markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
         if categories(user_category):
             for i in categories(user_category):
                 button_name = types.KeyboardButton(i)
@@ -606,6 +702,9 @@ def do_order(message):
                 markup.add("⏺В главное меню", "< Назад")
             else:
                 markup.add("⏺В главное меню")
+            if redactor.type != "user":
+                markup.add("-" * 40)
+                markup.add("Добавить\nкатегорию", "Переименовать\nкатегорию", "Удалить\nкатегорию")
             bot.send_message(
                 message.from_user.id, "Отлично, нажимай на нужную категорию", reply_markup=markup)
             bot.register_next_step_handler(message, next_category)
@@ -614,9 +713,16 @@ def do_order(message):
                 button_name = types.KeyboardButton(i)
                 markup.add(button_name)
             markup.add("⏺В главное меню", "< Назад")
-            # markup.add("< Назад")
+            text = "Отлично, выбери продукт"
+            if redactor.type != "user":
+                markup.add("-" * 40)
+                if product(user_category) == []:
+                    markup.add("Добавить\nкатегорию", "Добавить\nтовар")
+                else:
+                    markup.add("Добавить\nтовар", "Изменить\nтовар", "Удалить\nтовар")
+                text = "В одну категорию можно добавить ТОЛЬКО КАТЕГОРИИ ЛИБО ТОЛЬКО ПРОДУКТЫ "
             bot.send_message(message.from_user.id,
-                             "Отлично, выбери продукт", reply_markup=markup)
+                             text, reply_markup=markup)
             bot.register_next_step_handler(message, show_product)
     except IndexError:
         user_road = ["1"]
