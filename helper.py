@@ -1,18 +1,58 @@
 import random
 import sqlite3
-
+import hashlib
+import os
 
 db = sqlite3.connect("db/shop.db", check_same_thread=False)
 cursor = db.cursor()
 
+dbAdmin = sqlite3.connect("db/admin.db", check_same_thread=False)
+curAdmin = dbAdmin.cursor()
+
 user_product = False
 
 
-def generate_name():
+def generate_name(type):
     # choose from all lowercase letter
-    characters = """*!@#$%^&~`-_+={}[]()|:;"'?>.,< qwertyuiopasdfghjklzxcvbnm1234567890"""
-    result_str = ''.join(random.choice(characters) for el in range(40))
+
+    global result_str
+    if type == "filename":
+        characters = """*!@#$%^&~`-_+={}[]()|:;"'?>.,< qwertyuiopasdfghjklzxcvbnm1234567890"""
+        result_str = ''.join(random.choice(characters) for el in range(40))
+    elif type == "salt":
+        characters = """qwertyuiopasdfghjklzxcvbnm1234567890"""
+        result_str = ''.join(random.choice(characters) for el in range(20))
     return result_str
+
+
+def reg(user_id, password, type):
+    if not select_admin("_id", "admin", f"user_id = {user_id}"):
+        l = hash_func(user_id=user_id, password=password)
+        insert_admin("admin", None, l[0], type, l[1], l[2])
+
+
+def hash_func(user_id, password="", what_do="gen"):
+    user_id_byte = str(user_id)[2:7].encode("utf-8")
+    if what_do != "==":
+        # salt = os.urandom(32) # Новая соль для данного пользователя salt =
+        # b'\xf3`e\xd7\x9e\x91\x7f\x9c\x99\xec\xbe0p\xc4\xa2\x1e\xed\xc1\x0e\xe7\xb3\x18\xb9\xdd\x111\x8a\xe2I\xe3\x0c\xeb'
+        salt = generate_name("salt")
+        salt_byte = salt.encode("utf-8")
+        password_gen = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt_byte, 100000).hex()
+        user_id_gen = hashlib.pbkdf2_hmac('sha256', str(user_id).encode('utf-8'), user_id_byte, 100000).hex()
+        return [user_id, salt, password_gen]
+    else:
+        data = select_admin("salt, password", "admin", f"user_id = {user_id}")[0]
+        salt = data[0]
+        old_password = data[1]
+        salt_byte = salt.encode("utf-8")
+        new_password = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt_byte, 100000).hex()
+        if old_password == new_password:
+            return True
+        else:
+            return False
+
+
 
 
 def categories(user_category=1):
@@ -37,10 +77,18 @@ def product(user_category):
     return list_product
 
 
-def select_from_shop(whatis="*", fromis="categories", whereis=''):
-    cursor.execute("""SELECT {} FROM {} WHERE {};""".format(
+def select_admin(whatis="*", fromis="admin", whereis=''):
+    curAdmin.execute("""SELECT {} FROM {} WHERE {}""".format(
         whatis, fromis, whereis))
-    return cursor.fetchall()
+    return curAdmin.fetchall()
+
+
+def insert_admin(name_table, *values_for_paste):
+    amount_values = len(values_for_paste)
+    _vars = ("?, " * amount_values)[:-2]
+    curAdmin.execute(
+        f"""INSERT INTO {name_table} VALUES({_vars});""", values_for_paste)
+    dbAdmin.commit()
 
 
 def select_db(whatis="*", fromis="baskets", whereis=''):
@@ -54,9 +102,15 @@ def select_db(whatis="*", fromis="baskets", whereis=''):
 
 def insert_db(name_table, *values_for_paste):
     amount_values = len(values_for_paste)
-    _vars = ("? ," * amount_values)[:-2]
+    _vars = ("?, " * amount_values)[:-2]
     cursor.execute(
         f"""INSERT INTO {name_table} VALUES({_vars});""", values_for_paste)
+    db.commit()
+
+
+def delete_db(name_table, where):
+    cursor.execute(
+        f"""DELETE FROM {name_table} WHERE {where};""")
     db.commit()
 
 
@@ -65,33 +119,6 @@ def update_db(name_table, column, value, whereis):
     cursor.execute(
         f"""UPDATE {name_table} SET {column} = {value} WHERE {whereis}""")
     db.commit()
-
-
-def create_basket(message):
-    from datetime import datetime
-    user_id = str(message.chat.id)
-    username = message.from_user.username
-    dt_created = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-    tableName = "user_" + user_id
-
-    cursor.execute(f"""CREATE TABLE IF NOT EXISTS {tableName}(
-        _id INTEGER PRIMARY KEY AUTOINCREMENT,
-        id_product INTEGER,
-        amount INTEGER
-    );""")
-    if not select_db("_id", "baskets", "username = '{}'".format(username)):
-        cursor.execute(f"""INSERT INTO baskets VALUES(?, ?, ?, ?);""",
-                       (None, username, user_id, dt_created))
-        db.commit()
-
-
-# def select_from_clients(whatis="*", fromis="clients", whereis=''):
-#     if whereis == "":
-#         curUsers.execute("""SELECT {} FROM '{}';""".format(whatis, fromis))
-#     else:
-#         curUsers.execute("""SELECT {} FROM '{}' WHERE {};""".format(
-#             whatis, fromis, whereis))
-#     return curUsers.fetchall()
 
 
 def return_one_value(t):
