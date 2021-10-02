@@ -50,3 +50,66 @@ connect.commit()
             city TEXT,
             address TEXT
         )""")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        try:
+            if product_data["do"] == "photo_src":
+                file_info = bot.get_file(message.photo[len(message.photo) - 1].file_id)
+                downloaded_file = bot.download_file(file_info.file_path)
+                src = 'photo/' + generate_name("filename") + ".jpg"
+                with open(src, 'wb') as new_file:
+                    new_file.write(downloaded_file)
+                product_data["photo_src"] = src
+                insert_db("product", None, product_data["title"], product_data["about"], product_data["price"],
+                          product_data["photo_src"], int(user_road[-1]), 1)
+                do_order(message)
+        except TypeError:
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+            markup.add("Отмена")
+            img = open("photo/send_photo.png", 'rb')
+            product_data["do"] = "photo_src"
+            bot.send_photo(message.from_user.id, img, "Отправь повторно, сделав как на картинке", reply_markup=markup)
+            bot.register_next_step_handler(message, add_product)
