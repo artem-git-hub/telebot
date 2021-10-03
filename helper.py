@@ -28,7 +28,7 @@ def generate_name(type):
 def reg(user_id, password, type):
     if not select_admin("_id", "admin", f"user_id = {user_id}"):
         l = hash_func(user_id=user_id, password=password)
-        insert_admin("admin", None, l[0], type, l[1], l[2])
+        insert_admin("admin", None, l[0], type, l[1], l[2], None, None)
 
 
 def hash_func(user_id, password="", what_do="gen"):
@@ -51,8 +51,6 @@ def hash_func(user_id, password="", what_do="gen"):
             return True
         else:
             return False
-
-
 
 
 def categories(user_category=1):
@@ -78,8 +76,12 @@ def product(user_category):
 
 
 def select_admin(whatis="*", fromis="admin", whereis=''):
-    curAdmin.execute("""SELECT {} FROM {} WHERE {}""".format(
-        whatis, fromis, whereis))
+    if whereis == "":
+        curAdmin.execute("""SELECT {} FROM {};""".format(whatis, fromis))
+    else:
+        # print("""SELECT {} FROM {} WHERE {};""".format(whatis, fromis, whereis))
+        curAdmin.execute(
+            """SELECT {} FROM {} WHERE {};""".format(whatis, fromis, whereis))
     return curAdmin.fetchall()
 
 
@@ -95,6 +97,7 @@ def select_db(whatis="*", fromis="baskets", whereis=''):
     if whereis == "":
         cursor.execute("""SELECT {} FROM {};""".format(whatis, fromis))
     else:
+        # print("""SELECT {} FROM {} WHERE {};""".format(whatis, fromis, whereis))
         cursor.execute(
             """SELECT {} FROM {} WHERE {};""".format(whatis, fromis, whereis))
     return cursor.fetchall()
@@ -121,6 +124,13 @@ def update_db(name_table, column, value, whereis):
     db.commit()
 
 
+def update_admin(name_table="admin", column="", value="", whereis=""):
+    # print(f"""UPDATE {name_table} SET {column} = {value} WHERE {whereis};""")
+    curAdmin.execute(
+        f"""UPDATE {name_table} SET {column} = {value} WHERE {whereis}""")
+    dbAdmin.commit()
+
+
 def return_one_value(t):
     for i in t:
         for el in i:
@@ -132,3 +142,11 @@ def sum_element_in_list(_list):
     for i in _list:
         _str += i
     return _str
+
+
+def return_list(_tuple):
+    _list = []
+    for i in _tuple:
+        for g in i:
+            _list.append(g)
+    return _list

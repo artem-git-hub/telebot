@@ -11,7 +11,7 @@ from telebot import types
 
 from config import TOKEN
 from helper import select_admin, sum_element_in_list, return_one_value, insert_db, update_db, categories, \
-    product, select_db, generate_name, hash_func, reg
+    product, select_db, generate_name, hash_func, reg, return_list, update_admin
 
 logger = logging.getLogger('TeleBot')
 formatter = logging.Formatter(
@@ -93,7 +93,7 @@ def cmd_start(message):
     text = ""
     if message.text == "/start" or message.text == "/restart":
         text = send_mess_start
-        reg(message.from_user.id, "artem", "admin")
+        reg(message.from_user.id, "a", "manager")
         global messagebot
         messagebot = message
     elif message.text == "/help":
@@ -107,6 +107,18 @@ def cmd_start(message):
 @bot.message_handler(content_types=["text"])
 def accept_message(message):
     global user_road
+    if message.from_user.id in return_list(select_admin("user_id", "admin", "")):
+        if message.from_user.first_name is None:
+            first_name = ""
+        else:
+            first_name = message.from_user.first_name
+        if message.from_user.last_name is None:
+            last_name = ""
+        else:
+            last_name = message.from_user.last_name
+        fullname = first_name + "  " + last_name
+        update_admin("admin", "username", f"'{message.from_user.username}'", f"user_id = {message.from_user.id}")
+        update_admin("admin", "name", f"'{fullname}'", f"user_id = {message.from_user.id}")
     if message.text == "📁 Каталог":
         user_road = ["1"]
         do_order(message)
@@ -114,8 +126,12 @@ def accept_message(message):
         user_road = ["1"]
         cmd_start(message)
     elif message.text == "Админ панель":
-        redactor.operation = "show"
-        super_menu(message)
+        if redactor.type != "user":
+            redactor.operation = "show"
+            super_menu(message)
+        else:
+            user_road = ["1"]
+            cmd_start(message)
     elif message.text == "📣 Информация":
         get_info(message)
     elif message.text == "< Назад":
@@ -132,7 +148,8 @@ def accept_message(message):
     elif message.text == "Отмена":
         if redactor.type != "user":
             activate_admin(message)
-        return
+        user_road = ["1"]
+        cmd_start(message)
     elif message.text == "/getid":
         bot.send_message(message.from_user.id,
                          f"Your id : <b>{message.from_user.id}</b>\nChat id : <b>{message.chat.id}</b>",
@@ -150,7 +167,7 @@ def accept_message(message):
 
 def get_info(message):
     info = select_db("value", "settings", "name = 'info'")[0][
-               0] + "\n\nСодатель бота <a href='https://t.me/cha_artem'>ЭТОТ ЧЕЛОВЕК</a> "
+               0].replace("~~~", "\n") + "\n\nСодатель бота @cha_artem "
     bot.send_message(message.from_user.id, info, parse_mode="html")
 
 
@@ -205,14 +222,19 @@ def who_you(message):
 def super_menu(message):
     buttons = []
     if redactor.type == "admin":
-        buttons = ["Каталог", "Информация", "+ менеджер", "- менеджер", "Изменить пароль", "Передать права"]
+        buttons = ["Каталог", "Информация", "+ менеджер", "- менеджер", "Доп. настройки"]
     elif redactor.type == "manager":
         buttons = ["Каталог", "Информация"]
     if redactor.operation == "show":
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
         for i in list(range(len(buttons)))[::2]:
-            markup.row(types.KeyboardButton(buttons[i]), types.KeyboardButton(buttons[i + 1]))
-        bot.send_message(message.from_user.id, "Привет\nВыбирай что изменить", reply_markup=markup)
+            try:
+                markup.row(types.KeyboardButton(buttons[i]), types.KeyboardButton(buttons[i + 1]))
+            except IndexError:
+                markup.row(types.KeyboardButton(buttons[i]))
+        bot.send_message(message.from_user.id,
+                         "Привет\nВыбирай что изменить\n\n\n<b>Примечания:</b> \n1) <code>Не называй категории одинаково (вознинут проблемы с изминениями)</code>",
+                         reply_markup=markup, parse_mode="html")
         bot.register_next_step_handler(message, super_menu)
         redactor.operation = "edit"
     elif redactor.operation == "edit":
@@ -222,18 +244,162 @@ def super_menu(message):
                 user_road = ["1"]
                 do_order(message)
             elif message.text == buttons[1]:
-                pass
+                markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+                markup.add("Отмена")
+                info = select_db("value", "settings", f"name = 'info'")[0][0].replace("~~~", "\n")
+                bot.send_message(message.from_user.id, "<code>Сейчас информация: </code>\n\n" + info, parse_mode="html")
+                bot.send_message(message.from_user.id, "Введите новую информацию: ", reply_markup=markup)
+                redactor.operation = "edit_info"
+                bot.register_next_step_handler(message, super_menu)
             elif len(buttons) > 2:
                 if message.text == buttons[2]:
-                    pass
+                    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+                    markup.add("Отмена")
+                    list_manager = select_admin("user_id, username, name", "admin", f"type = 'manager'")
+                    send = "<code>Список менеджеров :</code>\n\n"
+                    for i in list_manager:
+                        if i[1] != None:
+                            uname = "@"+i[1]
+                        else:
+                            uname = "<code>скоро узнаем</code>"
+                        if i[2] != None:
+                            name = i[2]
+                        else:
+                            name = "<code>скоро узнаем</code>"
+                        _str = f"Имя: <code>{name}</code>\nUsername: {uname}\nTG id: <code>{i[0]}</code>\n\n"
+                        send += _str
+                    bot.send_message(message.from_user.id, send[:-2], parse_mode="html")
+                    bot.send_message(message.from_user.id,
+                                     "Чтобы добавить менеджера выполните следующие шаги :\n\n1) Будущий менеджер должен получить свой id\n(это можно введя /getid этому боту)\n\n2) Отправте мне этот id\n\n3) Задайте пароль этому менеджеру\n\n4) Передайте пароль менеджеру")
+                    bot.send_message(message.from_user.id, "Введите id будущего менеджера", reply_markup=markup)
+                    redactor.operation = "get_id_maneger"
+                    bot.register_next_step_handler(message, super_menu)
                 elif message.text == buttons[3]:
-                    pass
+                    list_manager = select_admin("user_id, username, name", "admin", f"type = 'manager'")
+                    send = "<code>Список менеджеров :</code>\n\n"
+                    for i in list_manager:
+                        if i[1] != None:
+                            uname = "@"+i[1]
+                        else:
+                            uname = "<b>скоро узнаем</b>"
+                        if i[2] != None:
+                            name = i[2]
+                        else:
+                            name = "<b>скоро узнаем</b>"
+                        _str = f"~ {list_manager.index(i) + 1} ~ \nИмя: <code>{name}</code>\nUsername: {uname}\nTG id: <code>{i[0]}</code>\n\n"
+                        send += _str
+                        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
+                    bot.send_message(message.from_user.id, send[:-2], parse_mode="html")
+
+                    bot.send_message(message.from_user.id, "Введите номер чтобы удалить: ", parse_mode="html", reply_markup=markup)
+                    redactor.operation = "get_id_maneger_for_delete"
+                    bot.register_next_step_handler(message, super_menu)
                 elif message.text == buttons[4]:
                     pass
-                elif message.text == buttons[5]:
-                    pass
+                else:
+                    bot.send_message(message.from_user.id, "Команда не понятна\nДля кого кнопки сделаны?????")
+                    redactor.operation = "show"
+                    super_menu(message)
+
             else:
                 bot.send_message(message.from_user.id, "Команда не понятна\nДля кого кнопки сделаны?????")
+                redactor.operation = "show"
+                super_menu(message)
+
+    elif redactor.operation == "edit_info":
+        if message.text != "Отмена":
+            info = [message.text][0].replace("\n", "~~~")
+            update_db("settings", "value", f'"{info}"', "name = 'info'")
+            info = select_db("value", "settings", f"name = 'info'")[0][0].replace("~~~", "\n")
+            bot.send_message(message.from_user.id, "<code>Сейчас информация: </code>\n\n" + info, parse_mode="html")
+            redactor.operation = "show"
+            super_menu(message)
+        else:
+            redactor.operation = "show"
+            super_menu(message)
+    elif redactor.operation == "get_id_maneger_for_delete":
+
+        global manager_id
+        if message.text != "Отмена":
+            list_manager = select_admin("user_id, username, name", "admin", f"type = 'manager'")
+            try:
+                if 0 < int(message.text) < len(list_manager) + 1:
+                    manager_id = list_manager[int(message.text) - 1][0]
+                    from helper import curAdmin, dbAdmin
+                    curAdmin.execute(f"""DELETE FROM admin WHERE user_id = {manager_id}""")
+                    dbAdmin.commit()
+                    list_manager = select_admin("user_id, username, name", "admin", f"type = 'manager'")
+                    send = "<code>Список менеджеров :</code>\n\n"
+                    for i in list_manager:
+                        if i[1] != None:
+                            uname = "@"+i[1]
+                        else:
+                            uname = "<b>скоро узнаем</b>"
+                        if i[2] != None:
+                            name = i[2]
+                        else:
+                            name = "<b>скоро узнаем</b>"
+                        _str = f"Имя: <code>{name}</code>\nUsername: {uname}\nTG id: <code>{i[0]}</code>\n\n"
+                        send += _str
+                    bot.send_message(message.from_user.id, send, parse_mode="html")
+                    redactor.operation = "show"
+                    super_menu(message)
+
+                else:
+                    bot.send_message(message.from_user.id, "Перебоp с числом")
+                    redactor.operation = "show"
+                    super_menu(message)
+
+            except TypeError:
+                bot.send_message(message.from_user.id, "Это вроде как не число")
+                redactor.operation = "show"
+                super_menu(message)
+        else:
+            redactor.operation = "show"
+            super_menu(message)
+    elif redactor.operation == "get_id_maneger":
+        if message.text != "Отмена":
+            try:
+                manager_id = int(message.text)
+                markup = types.ReplyKeyboardMarkup(resize_keyboard=True).add("Отмена")
+                bot.send_message(message.from_user.id, "Введите пароль", reply_markup=markup)
+                redactor.operation = "get_password_maneger"
+                bot.register_next_step_handler(message, super_menu)
+            except Exception:
+                markup = types.ReplyKeyboardMarkup(resize_keyboard=True).add("Отмена")
+                bot.send_message(message.from_user.id, "Отправте числовое значение", reply_markup=markup)
+                bot.register_next_step_handler(message, super_menu)
+        else:
+            redactor.operation = "show"
+            super_menu(message)
+    elif redactor.operation == "get_password_maneger":
+        if message.text != "Отмена":
+            reg(manager_id, message.text, "manager")
+            list_manager = select_admin("user_id, username, name", "admin", f"type = 'manager'")
+            send = "<code>Список менеджеров :</code>\n\n"
+            for i in list_manager:
+                if i[1] != None:
+                    uname = "@"+i[1]
+                else:
+                    uname = "<b>скоро узнаем</b>"
+                if i[2] != None:
+                    name = i[2]
+                else:
+                    name = "<b>скоро узнаем</b>"
+                _str = f"Имя: <code>{name}</code>\nUsername: {uname}\nTG id: <code>{i[0]}</code>\n\n"
+                send += _str
+            bot.send_message(message.from_user.id, send[:-2], parse_mode="html")
+            redactor.operation = "show"
+            super_menu(message)
+        else:
+            redactor.operation = "show"
+            super_menu(message)
+    else:
+        cmd_start(message)
+
+
+# для добаления менеджера
+manager_id = 0
 
 
 def edit_profile(message):
@@ -323,10 +489,10 @@ def show_basket(message):
         for i in basket:
             summ += i[3] * select_db("*", "product", f"_id = {i[2]}")[0][3]
 
-        caption = f"Название:\n{name_cat_pr}\nКол - во : {basket[show_product_id - 1][3]} шт.\n\n{aboutproduct[0][3]} * {basket[show_product_id - 1][3]} = {aboutproduct[0][3] * basket[show_product_id - 1][3]} "
-
+        caption = f"Название:\n<code>{name_cat_pr}</code>\nКол - во : <code>{basket[show_product_id - 1][3]} шт.</code>\n\n{aboutproduct[0][3]} * {basket[show_product_id - 1][3]} = <code>{aboutproduct[0][3] * basket[show_product_id - 1][3]}</code>"
         img = open(aboutproduct[0][4], 'rb')
-        bot.send_photo(message.chat.id, img, caption, reply_markup=button_basket(summ, show_product_id, basket))
+        bot.send_photo(message.chat.id, img, caption, reply_markup=button_basket(summ, show_product_id, basket),
+                       parse_mode="html")
     elif show_product_id > max_id:
         show_product_id = minimum
 
@@ -367,32 +533,34 @@ try:
     def edit_basket(user_id, id_parents_categories, id_product, what_do):
         global last_product
         title = last_product
-        if id_product == 0:
-            id_product = return_one_value(
-                select_db("_id", "product",
-                          "title = '{}' AND id_categories = '{}'".format(title, id_parents_categories)))
-        select_amount = return_one_value(
-            select_db("amount", "baskets", f"""product_id = {id_product} AND user_id = {user_id}"""))
-        if select_amount is None:
-            insert_db("baskets", None, user_id, id_product, 1)
-        else:
-            amount = select_amount
-            if what_do != "x":
-                if what_do == "+":
-                    amount += 1
-                elif what_do == "-":
-                    amount -= 1
-                update_db("baskets", "amount", amount, f"product_id = {id_product} AND user_id = {user_id};")
-                if amount <= 0:
-                    cursor.execute(
-                        f"""DELETE FROM baskets WHERE product_id = {id_product} AND user_id = {user_id};""")
-                    db.commit()
+        if title != "":
+            if id_product == 0:
+                id_product = return_one_value(
+                    select_db("_id", "product",
+                              "title = '{}' AND id_categories = '{}'".format(title, id_parents_categories)))
+            select_amount = return_one_value(
+                select_db("amount", "baskets", f"""product_id = {id_product} AND user_id = {user_id}"""))
+            if id_product:
+                if select_amount is None:
+                    insert_db("baskets", None, user_id, id_product, 1)
+                else:
+                    amount = select_amount
+                    if what_do != "x":
+                        if what_do == "+":
+                            amount += 1
+                        elif what_do == "-":
+                            amount -= 1
+                        update_db("baskets", "amount", amount, f"product_id = {id_product} AND user_id = {user_id};")
+                        if amount <= 0:
+                            cursor.execute(
+                                f"""DELETE FROM baskets WHERE product_id = {id_product} AND user_id = {user_id};""")
+                            db.commit()
 
-            else:
-                cursor.execute(
-                    f"""DELETE FROM baskets WHERE product_id = {id_product} AND user_id = {user_id};""")
-                db.commit()
-except Exception:
+                    else:
+                        cursor.execute(
+                            f"""DELETE FROM baskets WHERE product_id = {id_product} AND user_id = {user_id};""")
+                        db.commit()
+except sqlite3.Error as e:
     pass
 
 
@@ -404,7 +572,6 @@ def data(call):
         pass
     elif call.data == "add":
         edit_basket(call.message.chat.id, int(user_road[-1]), 0, "+")
-
         global last_product
         title = last_product
 
@@ -418,18 +585,21 @@ def data(call):
         id_product = return_one_value(
             select_db("_id", "product",
                       f"""title = '{title}' AND id_categories = {int(user_road[-1])}"""))
-        amount = return_one_value(select_db(
-            "amount", "baskets", f"""product_id = {id_product} AND user_id = {call.message.chat.id}"""))
-        all_about_product = []
-        for i in select_db("*", "product", "title = '{}' AND id_categories = '{}'".format(title,
-                                                                                          int(
-                                                                                              user_road[
-                                                                                                  -1]))):
-            all_about_product = list(i)
-        text = """Название: {}\nЦена: {} ₽\nОписание:\n{}\n\nКол-во в корзине: {}""".format(
-            all_about_product[1], all_about_product[3], all_about_product[2], amount)
-        bot.edit_message_caption(
-            chat_id=call.message.chat.id, message_id=call.message.id, caption=text, reply_markup=markup)
+
+        if id_product:
+            amount = return_one_value(select_db(
+                "amount", "baskets", f"""product_id = {id_product} AND user_id = {call.message.chat.id}"""))
+            all_about_product = []
+            for i in select_db("*", "product", "title = '{}' AND id_categories = '{}'".format(title,
+                                                                                              int(
+                                                                                                  user_road[
+                                                                                                      -1]))):
+                all_about_product = list(i)
+            text = """Название: <code>{}</code>\nЦена: <code>{} ₽</code>\nОписание:\n<code>{}</code>\n\nКол-во в корзине: {}""".format(
+                all_about_product[1], all_about_product[3], all_about_product[2], amount)
+            bot.edit_message_caption(
+                chat_id=call.message.chat.id, message_id=call.message.id, caption=text, reply_markup=markup,
+                parse_mode="html")
 
     elif "basket" in call.data:
         global show_product_id
@@ -513,7 +683,7 @@ def data(call):
                     "title", whereis=f"_id = {about_product[0][5]}")
                 price = about_product[0][3] * i[3]
                 all += price
-                h = f"<code>{i[3]}</code> X <code>{name_parents_category_product[0][0]} -> {about_product[0][1]}</code>\nСтоимость: <code>{price} ₽</code>\n\n"
+                h = f"{i[3]} X {name_parents_category_product[0][0]} -> {about_product[0][1]}\nСтоимость: {price} ₽\n\n"
                 user_basket += h
             user_basket += f"<b>Всего: {all} ₽</b>"
             clients = select_db(
@@ -558,8 +728,12 @@ def basket_ar(basket, message):
             row_width=2, resize_keyboard=True)
         first_button = types.KeyboardButton(text="📁 Каталог")
         keyboarding.add(first_button)
+        cursor.execute(
+            f"""DELETE FROM for_delete_product WHERE user_id = {message.chat.id} AND message_id = {message.message_id}""")
+        db.commit()
         bot.delete_message(message.chat.id,
                            message.message_id)
+
         bot.send_message(
             message.chat.id, "В вашей корзине <b>пусто</b> !", reply_markup=keyboarding, parse_mode="html")
         return
@@ -593,7 +767,7 @@ def show_product(message):
             pass
         else:
             amount_product = 0
-        caption = """Название: {}\nЦена: {} ₽\nОписание:\n{}\n\nКол-во в корзине: {}""".format(
+        caption = """Название: <code>{}</code>\nЦена: <code>{} ₽</code>\nОписание:\n<code>{}</code>\n\nКол-во в корзине: {}""".format(
             all_about_product[1], all_about_product[3], all_about_product[2], amount_product)
 
         markup = types.InlineKeyboardMarkup(row_width=1)
@@ -603,7 +777,7 @@ def show_product(message):
             "🛍 Корзина", callback_data="go to basket")
         markup.add(item2, item3)
         text = "Выбирай категорию"
-        bot.send_photo(message.from_user.id, img, caption, reply_markup=markup)
+        bot.send_photo(message.from_user.id, img, caption, reply_markup=markup, parse_mode="html")
         bot.register_next_step_handler(message, show_product)
     elif message.text in _list:
         global product_data
@@ -673,8 +847,6 @@ def edit_product(message):
                         markup.add(parts_list[i], parts_list[i + 1])
                     edit_id = select_db("_id", "product", f"id_categories = {int(user_road[-1])} AND nodelete = 1")[
                         abs(int(message.text)) - 1][0]
-                    # edit_id = _list[int(message.text) - 1]
-                    print(_list, edit_id)
                     product_data["id"] = edit_id
                     product_data["do"] = "none"
                     bot.send_message(message.from_user.id, "Выбери что изменить", reply_markup=markup)
@@ -682,7 +854,6 @@ def edit_product(message):
                 else:
                     do_order(message)
             except Exception as e:
-                print(e)
                 do_order(message)
         elif message.text == "Отмена":
             do_order(message)
@@ -706,7 +877,6 @@ def edit_product(message):
             do = product_data["do"]
             if do == "edit_name":
                 product_data["title"] = message.text
-                print(product_data["title"])
                 update_db("product", "title", f'"{message.text}"', f"_id = {product_data['id']}")
                 do_order(message)
             elif do == "edit_about":
@@ -948,10 +1118,10 @@ def check_and_delete(message):
     insert_db("for_delete_product", None, message.chat.id, message.message_id + 1)
     last_message = select_db("*", "for_delete_product", f"user_id = {message.chat.id}")
     if len(last_message) > 1:
-        bot.delete_message(chat_id=last_message[0][1], message_id=last_message[0][2])
         cursor.execute(
             f"""DELETE FROM for_delete_product WHERE user_id = {last_message[0][1]} AND message_id = {last_message[0][2]}""")
         db.commit()
+        bot.delete_message(chat_id=last_message[0][1], message_id=last_message[0][2])
 
 
 if __name__ == '__main__':
