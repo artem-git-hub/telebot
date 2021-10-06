@@ -33,7 +33,7 @@ def reg(user_id, password, type):
 
 def hash_func(user_id, password="", what_do="gen"):
     user_id_byte = str(user_id)[2:7].encode("utf-8")
-    if what_do != "==":
+    if what_do == "gen":
         # salt = os.urandom(32) # Новая соль для данного пользователя salt =
         # b'\xf3`e\xd7\x9e\x91\x7f\x9c\x99\xec\xbe0p\xc4\xa2\x1e\xed\xc1\x0e\xe7\xb3\x18\xb9\xdd\x111\x8a\xe2I\xe3\x0c\xeb'
         salt = generate_name("salt")
@@ -41,6 +41,12 @@ def hash_func(user_id, password="", what_do="gen"):
         password_gen = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt_byte, 100000).hex()
         user_id_gen = hashlib.pbkdf2_hmac('sha256', str(user_id).encode('utf-8'), user_id_byte, 100000).hex()
         return [user_id, salt, password_gen]
+    elif what_do == "edit_pass":
+        salt = select_admin("salt", "admin", f"user_id = {user_id}")[0][0]
+        salt_byte = salt.encode("utf-8")
+        new_password = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt_byte, 100000).hex()
+        update_admin("admin", "password", f"'{new_password}'", f"user_id = {user_id}")
+        return True
     else:
         data = select_admin("salt, password", "admin", f"user_id = {user_id}")[0]
         salt = data[0]

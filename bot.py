@@ -74,7 +74,8 @@ def cmd_start(message):
     third_button = types.KeyboardButton(text="👩‍🦽 Профиль")
     fourth_button = types.KeyboardButton(text="📣 Информация")
     fifth_button = types.KeyboardButton(text="Получить прайс лист")
-    keyboarder.add(first_button, second_button, third_button, fourth_button)
+    support = types.KeyboardButton(text="Поддержка")
+    keyboarder.add(first_button, second_button, third_button, fourth_button, support)
     if redactor.type != "user":
         admin = types.KeyboardButton(text="Админ панель")
         keyboarder.add(admin)
@@ -93,20 +94,23 @@ def cmd_start(message):
     text = ""
     if message.text == "/start" or message.text == "/restart":
         text = send_mess_start
-        reg(message.from_user.id, "a", "manager")
         global messagebot
         messagebot = message
     elif message.text == "/help":
         text = send_mess_help
     else:
         text = "Ну чтож продолжим"
-    bot.send_message(message.from_user.id, text,
+    bot.send_message(message.from_user.id, text + "\n\nЕсли возникнут проблемы в работе бота просто напиши /start",
                      reply_markup=keyboarder, parse_mode='html')
 
 
 @bot.message_handler(content_types=["text"])
 def accept_message(message):
     global user_road
+    # try:
+    #     redactor.type = select_admin("type", "admin", f"user_id = {message.from_user.id}")[0][0]
+    # except sqlite3.Error:
+    #     redactor.type = "user"
     if message.from_user.id in return_list(select_admin("user_id", "admin", "")):
         if message.from_user.first_name is None:
             first_name = ""
@@ -125,6 +129,19 @@ def accept_message(message):
     elif message.text == "⏺В главное меню":
         user_road = ["1"]
         cmd_start(message)
+    elif message.text == "Поддержка":
+        support_user_id = select_db("value", "settings", "name = 'support'")[0][0]
+        username_support = select_admin("username", "admin", f"user_id = '{support_user_id}'")[0][0]
+        dev_support_bot = select_db("value", "settings", "name = 'develop_bot'")[0][0]
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        url = ["https://t.me/" + dev_support_bot, "https://t.me/" + username_support]
+        support = types.InlineKeyboardButton("Проблемы с ассортиментом, заказом и т.д", url=url[1])
+        develop = types.InlineKeyboardButton("Проблемы в работе бота", url=url[0])
+        markup.row(develop)
+        markup.row(support)
+        bot.send_message(message.from_user.id, "Если возникли проблемы то пиши (не ошибись кому писать!)",
+                         reply_markup=markup, parse_mode='html')
+        bot.register_next_step_handler(message, accept_message)
     elif message.text == "Админ панель":
         if redactor.type != "user":
             redactor.operation = "show"
@@ -159,15 +176,16 @@ def accept_message(message):
     else:
         bot.send_message(
             message.from_user.id,
-            "Походу меня только что исправили\n<code>НУ ИЛИ ТЫ ЧТО-ТО НЕ ТО ВВЁЛ</code>\nНо сейчас уже всё ок)",
+            "Походу меня только что исправили\n<code>(или может ты что то не то ввёл)</code>\nНо сейчас уже всё ок)",
             parse_mode="html")
         user_road = ["1"]
         cmd_start(message)
 
 
 def get_info(message):
+    developer = select_db("value", "settings", "name = 'develop_man'")[0][0]
     info = select_db("value", "settings", "name = 'info'")[0][
-               0].replace("~~~", "\n") + "\n\nСодатель бота @cha_artem "
+               0].replace("~~~", "\n") + f"\n\nСодатель бота @{developer} "
     bot.send_message(message.from_user.id, info, parse_mode="html")
 
 
@@ -184,10 +202,15 @@ def activate_admin(message):
 
 def who_you(message):
     if not select_admin("_id", "admin", f"user_id = {message.from_user.id}"):
-        bot.send_message(message.from_user.id, "Я тебя не знаю")
+        bot.send_message(message.from_user.id, "Тебя нет в списках")
         cmd_start(message)
     elif message.text == "Отмена":
-        activate_admin(message)
+        if redactor.access == "no":
+            activate_admin(message)
+        else:
+            redactor.operation = "extra_edit"
+            super_menu(message)
+            redactor.access = "no"
     elif message.text == "⏺В главное меню":
         accept_message(message)
     elif "Я" in message.text:
@@ -196,7 +219,7 @@ def who_you(message):
         if "админ" in message.text:
             bot.send_message(message.chat.id, "Введи пароль от панели администратора", reply_markup=markup)
             redactor.type = "admin"
-        elif "менеджер" in message.text:
+        if "менеджер" in message.text:
             bot.send_message(message.chat.id, "Введи пароль менеджера", reply_markup=markup)
             redactor.type = "manager"
         redactor.operation = "password"
@@ -204,27 +227,55 @@ def who_you(message):
         bot.register_next_step_handler(message, who_you)
     else:
         if redactor.type != "user":
-            if redactor.operation == "password":
+            if "password" in redactor.operation:
+                redactor.type = select_admin("type", "admin", whereis=f"user_id = {message.from_user.id}")[0][0]
                 if hash_func(message.from_user.id, message.text, "==") and \
                         select_admin("type", "admin", whereis=f"user_id = {message.from_user.id}")[0][
                             0] == redactor.type:
-                    redactor.operation = "show"
-                    super_menu(message)
+                    if redactor.operation == "password":
+                        redactor.operation = "show"
+                        super_menu(message)
+                    else:
+                        redactor.access = "yes"
+                        # авторизация для изменения пароля для администратора
+                        bot.send_message(message.from_user.id,
+                                         "Введи новый пароль (ТОЛЬКО ЗАПОМНИ ЕГО!!!\nЕСЛИ УТЕРЯЕШЬ ЕГО УЖЕ НЕ ВОССТАНОВИТЬ, только при обращении к создателю бота)")
+                        bot.register_next_step_handler(message, edit_password_admin)
                 else:
                     bot.send_message(message.from_user.id, "Не правильно")
                     redactor.operation = "no"
                     redactor.type = "user"
                     who_you(message)
+            elif message.text == "Отмена":
+                redactor.operation = "extra_show"
+                super_menu(message)
         else:
             activate_admin(message)
 
 
+def edit_password_admin(message):
+    try:
+        hash_func(message.from_user.id, message.text, "edit_pass")
+        bot.send_message(message.from_user.id, "Пароль успешно заменён.")
+        redactor.operation = "extra_edit"
+        super_menu(message)
+    except Exception:
+        developer = select_db("value", "settings", "name = 'develop_man'")[0][0]
+        bot.send_message(message.from_user.id, f"Произошла ошибка!\nЛучше сообщите @{developer}")
+
+
 def super_menu(message):
     buttons = []
+    extra_buttons = []
+    redactor.type = select_admin("type", "admin", f"user_id = {message.from_user.id}")[0][0]
     if redactor.type == "admin":
-        buttons = ["Каталог", "Информация", "+ менеджер", "- менеджер", "Доп. настройки"]
+        buttons = ["Каталог", "Информация", "Менеджеры"]
+        extra_buttons = ["Рассылка для клиетов", "Рассылка для менеджеров", "Менеджер для заказов",
+                         "Менеджер поддержки", "Изменить пароль", "Передать права"]
     elif redactor.type == "manager":
         buttons = ["Каталог", "Информация"]
+        extra_buttons = ["Рассылка для клиетов"]
+    buttons.append("Доп. настройки")
     if redactor.operation == "show":
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
         for i in list(range(len(buttons)))[::2]:
@@ -233,11 +284,13 @@ def super_menu(message):
             except IndexError:
                 markup.row(types.KeyboardButton(buttons[i]))
         bot.send_message(message.from_user.id,
-                         "Привет\nВыбирай что изменить\n\n\n<b>Примечания:</b> \n1) <code>Не называй категории одинаково (вознинут проблемы с изминениями)</code>",
+                         "Выбирай что изменить\n\n\n<b>Примечания:</b> \n1) <code>Не называй категории одинаково (вознинут проблемы с изминениями)</code>\n\n2) <code>Если бот завис попробуй повторить действие, ну или введи</code> /start",
                          reply_markup=markup, parse_mode="html")
         bot.register_next_step_handler(message, super_menu)
         redactor.operation = "edit"
     elif redactor.operation == "edit":
+
+        redactor.type = select_admin("type", "admin", f"user_id = {message.from_user.id}")[0][0]
         if message.text in buttons:
             if message.text == buttons[0]:
                 global user_road
@@ -251,51 +304,28 @@ def super_menu(message):
                 bot.send_message(message.from_user.id, "Введите новую информацию: ", reply_markup=markup)
                 redactor.operation = "edit_info"
                 bot.register_next_step_handler(message, super_menu)
-            elif len(buttons) > 2:
+            elif message.text == "Доп. настройки":
+                markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+                for i in extra_buttons[::2]:
+                    try:
+                        markup.add(i, extra_buttons[extra_buttons.index(i) + 1])
+                    except IndexError:
+                        markup.add(i)
+                markup.add("Назад")
+                bot.send_message(message.from_user.id, "Доп. настройки", reply_markup=markup)
+                redactor.operation = "extra_edit"
+                bot.register_next_step_handler(message, super_menu)
+            elif len(buttons) > 3:
                 if message.text == buttons[2]:
-                    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-                    markup.add("Отмена")
-                    list_manager = select_admin("user_id, username, name", "admin", f"type = 'manager'")
-                    send = "<code>Список менеджеров :</code>\n\n"
-                    for i in list_manager:
-                        if i[1] != None:
-                            uname = "@"+i[1]
-                        else:
-                            uname = "<code>скоро узнаем</code>"
-                        if i[2] != None:
-                            name = i[2]
-                        else:
-                            name = "<code>скоро узнаем</code>"
-                        _str = f"Имя: <code>{name}</code>\nUsername: {uname}\nTG id: <code>{i[0]}</code>\n\n"
-                        send += _str
-                    bot.send_message(message.from_user.id, send[:-2], parse_mode="html")
-                    bot.send_message(message.from_user.id,
-                                     "Чтобы добавить менеджера выполните следующие шаги :\n\n1) Будущий менеджер должен получить свой id\n(это можно введя /getid этому боту)\n\n2) Отправте мне этот id\n\n3) Задайте пароль этому менеджеру\n\n4) Передайте пароль менеджеру")
-                    bot.send_message(message.from_user.id, "Введите id будущего менеджера", reply_markup=markup)
-                    redactor.operation = "get_id_maneger"
-                    bot.register_next_step_handler(message, super_menu)
+                    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Добавить менеджера",
+                                                                                              "Удалить менеджера",
+                                                                                              "Назад")
+                    bot.send_message(message.from_user.id, show_manager_list(), reply_markup=markup, parse_mode="html")
+                    bot.register_next_step_handler(message, edit_managers)
                 elif message.text == buttons[3]:
-                    list_manager = select_admin("user_id, username, name", "admin", f"type = 'manager'")
-                    send = "<code>Список менеджеров :</code>\n\n"
-                    for i in list_manager:
-                        if i[1] != None:
-                            uname = "@"+i[1]
-                        else:
-                            uname = "<b>скоро узнаем</b>"
-                        if i[2] != None:
-                            name = i[2]
-                        else:
-                            name = "<b>скоро узнаем</b>"
-                        _str = f"~ {list_manager.index(i) + 1} ~ \nИмя: <code>{name}</code>\nUsername: {uname}\nTG id: <code>{i[0]}</code>\n\n"
-                        send += _str
-                        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
-                    bot.send_message(message.from_user.id, send[:-2], parse_mode="html")
 
-                    bot.send_message(message.from_user.id, "Введите номер чтобы удалить: ", parse_mode="html", reply_markup=markup)
-                    redactor.operation = "get_id_maneger_for_delete"
+                    redactor.operation = "extra_edit"
                     bot.register_next_step_handler(message, super_menu)
-                elif message.text == buttons[4]:
-                    pass
                 else:
                     bot.send_message(message.from_user.id, "Команда не понятна\nДля кого кнопки сделаны?????")
                     redactor.operation = "show"
@@ -305,7 +335,87 @@ def super_menu(message):
                 bot.send_message(message.from_user.id, "Команда не понятна\nДля кого кнопки сделаны?????")
                 redactor.operation = "show"
                 super_menu(message)
+    elif redactor.operation == "extra_edit":
+        redactor.type = select_admin("type", "admin", f"user_id = {message.from_user.id}")[0][0]
+        if message.text in extra_buttons:
+            if message.text == extra_buttons[0]:
+                markup = types.ReplyKeyboardMarkup(resize_keyboard=True).add("Отмена")
+                bot.send_message(message.from_user.id, "Введи сообщение для всех клиентов бота: ", reply_markup=markup)
+                bot.register_next_step_handler(message, send_msg_clients)
+            if len(extra_buttons) > 1:
+                if message.text == extra_buttons[1]:
+                    markup = types.ReplyKeyboardMarkup(resize_keyboard=True).add("Отмена")
+                    bot.send_message(message.from_user.id, "Введи сообщение для менеджеров бота: ", reply_markup=markup)
+                    bot.register_next_step_handler(message, send_msg_manager)
+                elif message.text == extra_buttons[2]:
+                    try:
+                        manager_id_order = select_db("value", "settings", "name = 'order'")[0][0]
+                    except IndexError:
+                        manager_id_order = select_admin("user_id", "admin", f"type = 'manager'")[0][0]
+                        update_db("settings", "value", f"'{manager_id_order}'", f"name = 'order'")
+                    manager = select_admin("username, name", "admin", f"user_id = {manager_id_order}")[0]
+                    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Изменить", "Назад")
+                    about_manager = f"Username: @{manager[0]}\nИмя в ТГ: {manager[1]}"
+                    text = f"Сейчас менеджером для заказов назначен: \n\n\n{about_manager}"
+                    bot.send_message(message.from_user.id, text, reply_markup=markup, parse_mode="html")
+                    redactor.operation = "edit_order_manager"
+                    bot.register_next_step_handler(message, super_menu)
+                elif message.text == extra_buttons[3]:
+                    try:
+                        manager_id_support = select_db("value", "settings", "name = 'support'")[0][0]
+                    except IndexError:
+                        manager_id_support = select_admin("user_id", "admin", f"type = 'manager'")[0][0]
+                        update_db("settings", "value", f"'{manager_id_support}'", f"name = 'support'")
+                    manager = select_admin("username, name", "admin", f"user_id = {manager_id_support}")[0]
+                    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Изменить", "Назад")
+                    about_manager = f"Username: @{manager[0]}\nИмя в ТГ: {manager[1]}"
+                    text = f"Сейчас менеджером поддержки назначен: \n\n\n{about_manager}"
+                    bot.send_message(message.from_user.id, text, reply_markup=markup, parse_mode="html")
+                    redactor.operation = "edit_support_manager"
+                    bot.register_next_step_handler(message, super_menu)
+                elif message.text == extra_buttons[4]:
+                    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
+                    bot.send_message(message.from_user.id, "Введи текущий пароль", reply_markup=markup)
+                    redactor.operation, redactor.type = "password edit", select_admin("type", "admin",
+                                                                                      f"user_id = {message.from_user.id}")
 
+                    bot.register_next_step_handler(message, who_you)
+                elif message.text == extra_buttons[5]:
+                    bot.send_message(message.from_user.id,
+                                     "Передать права администратора можно только зарегестрированным менеджерам!")
+                    bot.send_message(message.from_user.id, "<b>ДАННОЕ ДЕЙСТВИЕ УЖЕ НЕЛЬЗЯ БУДЕТ ОТМЕНИТЬ</b>",
+                                     parse_mode="html")
+                    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
+                    man_l = show_manager_list("yes")
+                    if man_l == None:
+                        man_l =  ""
+                    bot.send_message(message.from_user.id,
+                                     "Новый администраро это - \n\nвведи число\n\n" + man_l,
+                                     reply_markup=markup, parse_mode="html")
+                    bot.register_next_step_handler(message, edit_admin)
+        else:
+            redactor.operation = "show"
+            super_menu(message)
+    elif redactor.operation == "edit_order_manager":
+        if message.text == "Изменить":
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
+            bot.send_message(message.from_user.id,
+                             "Кто теперь будет менеджером по заказом\n\nвведи число\n\n" + show_manager_list("yes"),
+                             reply_markup=markup, parse_mode="html")
+            bot.register_next_step_handler(message, edit_order_manager)
+        else:
+            redactor.operation = "extra_edit"
+            super_menu(message)
+    elif redactor.operation == "edit_support_manager":
+        if message.text == "Изменить":
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
+            bot.send_message(message.from_user.id,
+                             "Кто теперь будет менеджером поддержки\n\nвведи число\n\n" + show_manager_list("yes"),
+                             reply_markup=markup, parse_mode="html")
+            bot.register_next_step_handler(message, edit_support_manager)
+        else:
+            redactor.operation = "extra_edit"
+            super_menu(message)
     elif redactor.operation == "edit_info":
         if message.text != "Отмена":
             info = [message.text][0].replace("\n", "~~~")
@@ -328,20 +438,7 @@ def super_menu(message):
                     from helper import curAdmin, dbAdmin
                     curAdmin.execute(f"""DELETE FROM admin WHERE user_id = {manager_id}""")
                     dbAdmin.commit()
-                    list_manager = select_admin("user_id, username, name", "admin", f"type = 'manager'")
-                    send = "<code>Список менеджеров :</code>\n\n"
-                    for i in list_manager:
-                        if i[1] != None:
-                            uname = "@"+i[1]
-                        else:
-                            uname = "<b>скоро узнаем</b>"
-                        if i[2] != None:
-                            name = i[2]
-                        else:
-                            name = "<b>скоро узнаем</b>"
-                        _str = f"Имя: <code>{name}</code>\nUsername: {uname}\nTG id: <code>{i[0]}</code>\n\n"
-                        send += _str
-                    bot.send_message(message.from_user.id, send, parse_mode="html")
+                    bot.send_message(message.from_user.id, show_manager_list(), parse_mode="html")
                     redactor.operation = "show"
                     super_menu(message)
 
@@ -360,11 +457,15 @@ def super_menu(message):
     elif redactor.operation == "get_id_maneger":
         if message.text != "Отмена":
             try:
-                manager_id = int(message.text)
-                markup = types.ReplyKeyboardMarkup(resize_keyboard=True).add("Отмена")
-                bot.send_message(message.from_user.id, "Введите пароль", reply_markup=markup)
-                redactor.operation = "get_password_maneger"
-                bot.register_next_step_handler(message, super_menu)
+                if redactor.type == "admin":
+                    manager_id = int(message.text)
+                    markup = types.ReplyKeyboardMarkup(resize_keyboard=True).add("Отмена")
+                    bot.send_message(message.from_user.id, "Введите пароль", reply_markup=markup)
+                    redactor.operation = "get_password_maneger"
+                    bot.register_next_step_handler(message, super_menu)
+                else:
+                    redactor.operation = "show"
+                    super_menu(message)
             except Exception:
                 markup = types.ReplyKeyboardMarkup(resize_keyboard=True).add("Отмена")
                 bot.send_message(message.from_user.id, "Отправте числовое значение", reply_markup=markup)
@@ -373,24 +474,19 @@ def super_menu(message):
             redactor.operation = "show"
             super_menu(message)
     elif redactor.operation == "get_password_maneger":
-        if message.text != "Отмена":
-            reg(manager_id, message.text, "manager")
-            list_manager = select_admin("user_id, username, name", "admin", f"type = 'manager'")
-            send = "<code>Список менеджеров :</code>\n\n"
-            for i in list_manager:
-                if i[1] != None:
-                    uname = "@"+i[1]
-                else:
-                    uname = "<b>скоро узнаем</b>"
-                if i[2] != None:
-                    name = i[2]
-                else:
-                    name = "<b>скоро узнаем</b>"
-                _str = f"Имя: <code>{name}</code>\nUsername: {uname}\nTG id: <code>{i[0]}</code>\n\n"
-                send += _str
-            bot.send_message(message.from_user.id, send[:-2], parse_mode="html")
-            redactor.operation = "show"
-            super_menu(message)
+        if redactor.type == "admin":
+            if message.text != "Отмена":
+                reg(manager_id, message.text, "manager")
+                list_clients = select_db("user_id, username", "clients", "")
+                for i in list_clients:
+                    if i[0] == manager_id:
+                        update_admin("admin", "username", f'"{i[1]}"', f"user_id = {manager_id}")
+                bot.send_message(message.from_user.id, show_manager_list()[:-2], parse_mode="html")
+                redactor.operation = "show"
+                super_menu(message)
+            else:
+                redactor.operation = "show"
+                super_menu(message)
         else:
             redactor.operation = "show"
             super_menu(message)
@@ -400,6 +496,202 @@ def super_menu(message):
 
 # для добаления менеджера
 manager_id = 0
+
+
+
+def edit_admin(message):
+    try:
+        id_manager_in_list = int(message.text)
+        list_manager = return_list(select_admin("user_id", "admin", f"type = 'manager'"))
+        if 0 < id_manager_in_list < len(list_manager) + 1:
+            tg_id = list_manager[id_manager_in_list - 1]
+            update_admin("admin", "type", "'admin'", f'user_id = {tg_id}')
+            bot.send_message(tg_id, "Теперь ты администратор\n\nПОСТАРАЙСЯ КАК МОЖНО СКОРЕЕ СМЕНИТЬ ПАРОЛЬ")
+            update_admin("admin", "type", "'manager'", f'user_id = {message.from_user.id}')
+            developer = select_db("value", "settings", "name = 'develop_man'")[0][0]
+            bot.send_message(message.from_user.id, f"Теперь вы менеджер, а назначеный вами человек администратор\n\nЕсли же это произошло по ошибке то обратитесь @{developer}")
+            redactor.type, redactor.operation = "user", "no"
+            activate_admin(message)
+        else:
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
+            bot.send_message(message.from_user.id,
+                             f"Перебор с индексом:\nЗначение от 0 до {len(list_manager) + 1}, а у тебя {id_manager_in_list}",
+                             reply_markup=markup)
+            bot.register_next_step_handler(message, edit_admin)
+    except ValueError:
+        if message.text == "Отмена":
+            redactor.operation = "extra_edit"
+            super_menu(message)
+        else:
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
+            bot.send_message(message.from_user.id, "Введено не число (повтори): ", reply_markup=markup)
+            bot.register_next_step_handler(message, edit_admin)
+
+
+
+def edit_order_manager(message):
+    try:
+        id_manager_in_list = int(message.text)
+        list_manager = return_list(select_admin("user_id", "admin", f"type = 'manager'"))
+        if 0 < id_manager_in_list < len(list_manager) + 1:
+            tg_id = list_manager[id_manager_in_list - 1]
+            update_db("settings", "value", tg_id, "name = 'order'")
+            manager_id_order = select_db("value", "settings", "name = 'order'")[0][0]
+            manager = select_admin("username, name", "admin", f"user_id = {manager_id_order}")[0]
+            about_manager = f"Username: @{manager[0]}\nИмя в ТГ: {manager[1]}"
+            text = f"Сейчас менеджером назначен: \n\n\n{about_manager}"
+            bot.send_message(message.from_user.id, text, parse_mode="html")
+            redactor.operation = "extra_edit"
+            super_menu(message)
+        else:
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
+            bot.send_message(message.from_user.id,
+                             f"Перебор с индексом:\nЗначение от 0 до {len(list_manager) + 1}, а у тебя {id_manager_in_list}",
+                             reply_markup=markup)
+            bot.register_next_step_handler(message, edit_order_manager)
+    except ValueError:
+        if message.text == "Отмена":
+            redactor.operation = "extra_edit"
+            super_menu(message)
+        else:
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
+            bot.send_message(message.from_user.id, "Введено не число (повтори): ", reply_markup=markup)
+            bot.register_next_step_handler(message, edit_order_manager)
+
+
+def edit_support_manager(message):
+    try:
+        id_manager_in_list = int(message.text)
+        list_manager = return_list(select_admin("user_id", "admin", f"type = 'manager'"))
+        if 0 < id_manager_in_list < len(list_manager) + 1:
+            tg_id = list_manager[id_manager_in_list - 1]
+            update_db("settings", "value", tg_id, "name = 'support'")
+            manager_id_support = select_db("value", "settings", "name = 'support'")[0][0]
+            manager = select_admin("username, name", "admin", f"user_id = {manager_id_support}")[0]
+            about_manager = f"Username: @{manager[0]}\nИмя в ТГ: {manager[1]}"
+            text = f"Сейчас менеджером поддержки: \n\n\n{about_manager}"
+            bot.send_message(message.from_user.id, text, parse_mode="html")
+            redactor.operation = "extra_edit"
+            super_menu(message)
+        else:
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
+            bot.send_message(message.from_user.id,
+                             f"Перебор с индексом:\nЗначение от 0 до {len(list_manager) + 1}, а у тебя {id_manager_in_list}",
+                             reply_markup=markup)
+            bot.register_next_step_handler(message, edit_support_manager)
+    except ValueError:
+        if message.text == "Отмена":
+            redactor.operation = "extra_edit"
+            super_menu(message)
+        else:
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
+            bot.send_message(message.from_user.id, "Введено не число (повтори): ", reply_markup=markup)
+            bot.register_next_step_handler(message, edit_support_manager)
+
+
+def edit_managers(message):
+    if message.text == "Добавить менеджера":
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.add("Отмена")
+        bot.send_message(message.from_user.id, show_manager_list()[:-2], parse_mode="html")
+        bot.send_message(message.from_user.id,
+                         "Чтобы добавить менеджера выполните следующие шаги :\n\n1) Будущий менеджер должен получить свой id\n(это можно введя /getid этому боту)\n\n2) Отправте мне этот id\n\n3) Задайте пароль этому менеджеру\n\n4) Передайте пароль менеджеру")
+        bot.send_message(message.from_user.id, "Введите id будущего менеджера", reply_markup=markup)
+        redactor.operation = "get_id_maneger"
+        bot.register_next_step_handler(message, super_menu)
+    elif message.text == "Удалить менеджера":
+        list_manager = select_admin("user_id, username, name", "admin", f"type = 'manager'")
+        send = "<code>Список менеджеров :</code>\n\n"
+        for i in list_manager:
+            if i[1] != None:
+                uname = "@" + i[1]
+            else:
+                uname = "<b>скоро узнаем</b>"
+            if i[2] != None:
+                name = i[2]
+            else:
+                name = "<b>скоро узнаем</b>"
+            _str = f"~ {list_manager.index(i) + 1} ~ \nИмя: <code>{name}</code>\nUsername: {uname}\nTG id: <code>{i[0]}</code>\n\n"
+            send += _str
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
+        bot.send_message(message.from_user.id, send[:-2], parse_mode="html")
+
+        bot.send_message(message.from_user.id, "Введите номер чтобы удалить: ", parse_mode="html",
+                         reply_markup=markup)
+        redactor.operation = "get_id_maneger_for_delete"
+        bot.register_next_step_handler(message, super_menu)
+    else:
+        redactor.operation = "show"
+        super_menu(message)
+
+
+def show_manager_list(with_number=""):
+    list_manager = select_admin("user_id, username, name", "admin", f"type = 'manager'")
+    send = "<code>Список менеджеров :</code>\n\n"
+    if with_number == "":
+        for i in list_manager:
+            if i[1] != None:
+                uname = "@" + i[1]
+            else:
+                uname = "<b>скоро узнаем</b>"
+            if i[2] != None:
+                name = i[2]
+            else:
+                name = "<b>скоро узнаем</b>"
+            _str = f"Имя: <code>{name}</code>\nUsername: {uname}\nTG id: <code>{i[0]}</code>\n\n"
+            send += _str
+            return send
+    elif with_number == "yes":
+        for i in list_manager:
+            if i[1] != None:
+                uname = "@" + i[1]
+            else:
+                uname = "<b>скоро узнаем</b>"
+            if i[2] != None:
+                name = i[2]
+            else:
+                name = "<b>скоро узнаем</b>"
+            _str = f"- {list_manager.index(i) + 1} -\nИмя: <code>{name}</code>\nUsername: {uname}\nTG id: <code>{i[0]}</code>\n\n"
+            send += _str
+            return send
+
+
+def send_msg_clients(message):
+    if message.text != "Отмена":
+        clients_ids = return_list(select_db("user_id", "clients", ""))
+        keyboarder = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+        first_button = types.KeyboardButton(text="📁 Каталог")
+        second_button = types.KeyboardButton(text="🛍 Корзина")
+        third_button = types.KeyboardButton(text="👩‍🦽 Профиль")
+        fourth_button = types.KeyboardButton(text="📣 Информация")
+        keyboarder.add(first_button, second_button, third_button, fourth_button)
+        for i in clients_ids:
+            if redactor.type != "user":
+                admin = types.KeyboardButton(text="Админ панель")
+                keyboarder.add(admin)
+            bot.send_message(i, "Рассылка:\n" + message.text, reply_markup=keyboarder)
+        redactor.operation = "show"
+        super_menu(message)
+
+
+    else:
+        redactor.operation = "extra_edit"
+        super_menu(message)
+
+
+def send_msg_manager(message):
+    if message.text != "Отмена":
+        clients_ids = return_list(select_admin("user_id", "admin", f"type = 'manager'"))
+        keyboarder = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+        admin = types.KeyboardButton(text="Админ панель")
+        keyboarder.add(admin)
+        for i in clients_ids:
+            bot.send_message(i, "Рассылка для менеджеров:\n\n" + message.text, reply_markup=keyboarder)
+        redactor.operation = "show"
+        super_menu(message)
+    else:
+        redactor.operation = "extra_edit"
+        super_menu(message)
 
 
 def edit_profile(message):
