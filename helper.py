@@ -1,7 +1,7 @@
 import random
 import sqlite3
 import hashlib
-import os
+import uuid
 
 db = sqlite3.connect("db/shop.db", check_same_thread=False)
 cursor = db.cursor()
@@ -13,9 +13,7 @@ user_product = False
 
 
 def generate_filename():
-    characters = """*!@#$%^&~`-_+={}[]()|:;"'?>.,< qwertyuiopasdfghjklzxcvbnm1234567890"""
-    result_str = ''.join(random.choice(characters) for el in range(40))
-    return result_str
+    return str(uuid.uuid4())
 
 
 def generate_salt():
