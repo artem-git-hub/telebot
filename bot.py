@@ -11,7 +11,7 @@ from telebot import types
 
 from config import TOKEN
 from helper import select_admin, sum_element_in_list, return_one_value, insert_db, update_db, categories, \
-    product, select_db, generate_name, hash_func, reg, return_list, update_admin
+    product, select_db, generate_filename, hash_func, reg, return_list, update_admin
 
 logger = logging.getLogger('TeleBot')
 formatter = logging.Formatter(
@@ -82,7 +82,7 @@ def cmd_start(message):
     if message.text == "/start" or "/restart":
         user_id = str(message.chat.id)
         username = message.from_user.username
-
+        # reg(message.from_user.id, "1234", "admin")
         from datetime import datetime
 
         dt_created = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
@@ -99,7 +99,7 @@ def cmd_start(message):
     elif message.text == "/help":
         text = send_mess_help
     else:
-        text = "Ну чтож продолжим"
+        text = "Ну что ж продолжим"
     bot.send_message(message.from_user.id, text + "\n\nЕсли возникнут проблемы в работе бота просто напиши /start",
                      reply_markup=keyboarder, parse_mode='html')
 
@@ -129,6 +129,10 @@ def accept_message(message):
     elif message.text == "⏺В главное меню":
         user_road = ["1"]
         cmd_start(message)
+    elif message.text == "/edit_username_developer_man":
+        pass
+    elif message.text == "/edit_username_developer_bot":
+        pass
     elif message.text == "Поддержка":
         support_user_id = select_db("value", "settings", "name = 'support'")[0][0]
         username_support = select_admin("username", "admin", f"user_id = '{support_user_id}'")[0][0]
@@ -185,7 +189,7 @@ def accept_message(message):
 def get_info(message):
     developer = select_db("value", "settings", "name = 'develop_man'")[0][0]
     info = select_db("value", "settings", "name = 'info'")[0][
-               0].replace("~~~", "\n") + f"\n\nСодатель бота @{developer} "
+               0].replace("/\n", "\n") + f"\n\nСодатель бота @{developer} "
     bot.send_message(message.from_user.id, info, parse_mode="html")
 
 
@@ -284,7 +288,7 @@ def super_menu(message):
             except IndexError:
                 markup.row(types.KeyboardButton(buttons[i]))
         bot.send_message(message.from_user.id,
-                         "Выбирай что изменить\n\n\n<b>Примечания:</b> \n1) <code>Не называй категории одинаково (вознинут проблемы с изминениями)</code>\n\n2) <code>Если бот завис попробуй повторить действие, ну или введи</code> /start",
+                         "<b>Админ панель</b>\nВыбирай, что изменить\n\n\n<i>Примечания: \n1) Не называй категории одинаково (вознинут проблемы с изменениями)\n\n2) Если бот завис попробуй повторить действие, или введи </i>/start",
                          reply_markup=markup, parse_mode="html")
         bot.register_next_step_handler(message, super_menu)
         redactor.operation = "edit"
@@ -299,7 +303,7 @@ def super_menu(message):
             elif message.text == buttons[1]:
                 markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
                 markup.add("Отмена")
-                info = select_db("value", "settings", f"name = 'info'")[0][0].replace("~~~", "\n")
+                info = select_db("value", "settings", f"name = 'info'")[0][0].replace("/\n", "\n")
                 bot.send_message(message.from_user.id, "<code>Сейчас информация: </code>\n\n" + info, parse_mode="html")
                 bot.send_message(message.from_user.id, "Введите новую информацию: ", reply_markup=markup)
                 redactor.operation = "edit_info"
@@ -388,7 +392,7 @@ def super_menu(message):
                     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
                     man_l = show_manager_list("yes")
                     if man_l == None:
-                        man_l =  ""
+                        man_l = ""
                     bot.send_message(message.from_user.id,
                                      "Новый администраро это - \n\nвведи число\n\n" + man_l,
                                      reply_markup=markup, parse_mode="html")
@@ -418,9 +422,10 @@ def super_menu(message):
             super_menu(message)
     elif redactor.operation == "edit_info":
         if message.text != "Отмена":
-            info = [message.text][0].replace("\n", "~~~")
+            info = [message.text][0].replace("\n", "/\n")
+            print(info)
             update_db("settings", "value", f'"{info}"', "name = 'info'")
-            info = select_db("value", "settings", f"name = 'info'")[0][0].replace("~~~", "\n")
+            info = select_db("value", "settings", f"name = 'info'")[0][0].replace("/\n", "\n")
             bot.send_message(message.from_user.id, "<code>Сейчас информация: </code>\n\n" + info, parse_mode="html")
             redactor.operation = "show"
             super_menu(message)
@@ -498,7 +503,6 @@ def super_menu(message):
 manager_id = 0
 
 
-
 def edit_admin(message):
     try:
         id_manager_in_list = int(message.text)
@@ -509,7 +513,8 @@ def edit_admin(message):
             bot.send_message(tg_id, "Теперь ты администратор\n\nПОСТАРАЙСЯ КАК МОЖНО СКОРЕЕ СМЕНИТЬ ПАРОЛЬ")
             update_admin("admin", "type", "'manager'", f'user_id = {message.from_user.id}')
             developer = select_db("value", "settings", "name = 'develop_man'")[0][0]
-            bot.send_message(message.from_user.id, f"Теперь вы менеджер, а назначеный вами человек администратор\n\nЕсли же это произошло по ошибке то обратитесь @{developer}")
+            bot.send_message(message.from_user.id,
+                             f"Теперь вы менеджер, а назначеный вами человек администратор\n\nЕсли же это произошло по ошибке то обратитесь @{developer}")
             redactor.type, redactor.operation = "user", "no"
             activate_admin(message)
         else:
@@ -527,6 +532,15 @@ def edit_admin(message):
             bot.send_message(message.from_user.id, "Введено не число (повтори): ", reply_markup=markup)
             bot.register_next_step_handler(message, edit_admin)
 
+
+# def num_keyboard(message):
+#     markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
+#     markup.add("1", "2", "3")
+#     markup.add("4", "5", "6")
+#     markup.add("7", "8", "9")
+#     markup.add("0")
+#     markup.add("Отмена")
+#     return markup
 
 
 def edit_order_manager(message):
@@ -744,11 +758,11 @@ def show_profile(message):
     city = profile[0][5] if profile[0][5] is not None else "<code>не указан</code>"
     address = profile[0][6] if profile[0][6] is not None else "<code>не указан</code>"
     text = f"""ФИО: {fio}\nНомер : {phone_number}\nГород : {city}\nАдрес : {address}"""
-    keyboarding = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    keyboarding.add(types.KeyboardButton(
+    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    markup.add(types.KeyboardButton(
         text="Редактировать профиль"), types.KeyboardButton(text="⏺В главное меню"))
     bot.send_message(message.chat.id, text, parse_mode="html",
-                     reply_markup=keyboarding)
+                     reply_markup=markup)
 
 
 def show_basket(message):
@@ -1187,7 +1201,7 @@ def edit_product(message):
                 try:
                     file_info = bot.get_file(message.photo[len(message.photo) - 1].file_id)
                     downloaded_file = bot.download_file(file_info.file_path)
-                    src = 'photo/' + generate_name("filename") + ".jpg"
+                    src = 'photo/' + generate_filename() + ".jpg"
                     with open(src, 'wb') as new_file:
                         new_file.write(downloaded_file)
                     product_data["photo_src"] = src
@@ -1243,7 +1257,7 @@ def add_product(message):
             if product_data["do"] == "photo_src":
                 file_info = bot.get_file(message.photo[len(message.photo) - 1].file_id)
                 downloaded_file = bot.download_file(file_info.file_path)
-                src = 'photo/' + generate_name("filename") + ".jpg"
+                src = 'photo/' + generate_filename() + ".jpg"
                 with open(src, 'wb') as new_file:
                     new_file.write(downloaded_file)
                 product_data["photo_src"] = src

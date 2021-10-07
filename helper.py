@@ -12,16 +12,15 @@ curAdmin = dbAdmin.cursor()
 user_product = False
 
 
-def generate_name(type):
-    # choose from all lowercase letter
+def generate_filename():
+    characters = """*!@#$%^&~`-_+={}[]()|:;"'?>.,< qwertyuiopasdfghjklzxcvbnm1234567890"""
+    result_str = ''.join(random.choice(characters) for el in range(40))
+    return result_str
 
-    global result_str
-    if type == "filename":
-        characters = """*!@#$%^&~`-_+={}[]()|:;"'?>.,< qwertyuiopasdfghjklzxcvbnm1234567890"""
-        result_str = ''.join(random.choice(characters) for el in range(40))
-    elif type == "salt":
-        characters = """qwertyuiopasdfghjklzxcvbnm1234567890"""
-        result_str = ''.join(random.choice(characters) for el in range(20))
+
+def generate_salt():
+    characters = """qwertyuiopasdfghjklzxcvbnm1234567890"""
+    result_str = ''.join(random.choice(characters) for el in range(20))
     return result_str
 
 
@@ -36,7 +35,7 @@ def hash_func(user_id, password="", what_do="gen"):
     if what_do == "gen":
         # salt = os.urandom(32) # Новая соль для данного пользователя salt =
         # b'\xf3`e\xd7\x9e\x91\x7f\x9c\x99\xec\xbe0p\xc4\xa2\x1e\xed\xc1\x0e\xe7\xb3\x18\xb9\xdd\x111\x8a\xe2I\xe3\x0c\xeb'
-        salt = generate_name("salt")
+        salt = generate_salt()
         salt_byte = salt.encode("utf-8")
         password_gen = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt_byte, 100000).hex()
         user_id_gen = hashlib.pbkdf2_hmac('sha256', str(user_id).encode('utf-8'), user_id_byte, 100000).hex()
