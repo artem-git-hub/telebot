@@ -87,10 +87,13 @@ def cmd_start(message):
 
         dt_created = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
 
-        if not select_db("_id", "clients", f"username = '{username}'"):
+        if not select_db("_id", "clients", f"user_id = {message.from_user.id}"):
             cursor.execute("""INSERT INTO clients VALUES(?, ?, ?, ?, ?, ?, ?, ?);""",
                            (None, user_id, username, None, None, None, None, dt_created))
             db.commit()
+        else:
+            update_db("clients", "username", f"'{message.from_user.username}'",
+                      f"user_id = {message.from_user.id}")
     text = ""
     if message.text == "/start" or message.text == "/restart":
         text = send_mess_start
@@ -129,10 +132,18 @@ def accept_message(message):
     elif message.text == "⏺В главное меню":
         user_road = ["1"]
         cmd_start(message)
-    elif message.text == "/edit_username_developer_man":
-        pass
-    elif message.text == "/edit_username_developer_bot":
-        pass
+    elif "/edit_username_developer_man" in message.text:
+        if len(message.text) < 34:
+            do_order(message)
+        else:
+            update_db("settings", "value", f"'{message.text[29:]}'", "name = 'develop_man'")
+            do_order(message)
+    elif "/edit_username_developer_bot" in message.text:
+        if len(message.text) < 34:
+            do_order(message)
+        else:
+            update_db("settings", "value", f"'{message.text[29:]}'", "name = 'develop_bot'")
+            do_order(message)
     elif message.text == "Поддержка":
         support_user_id = select_db("value", "settings", "name = 'support'")[0][0]
         username_support = select_admin("username", "admin", f"user_id = '{support_user_id}'")[0][0]
@@ -275,7 +286,7 @@ def super_menu(message):
     if redactor.type == "admin":
         buttons = ["Каталог", "Информация", "Менеджеры"]
         extra_buttons = ["Рассылка для клиетов", "Рассылка для менеджеров", "Менеджер для заказов",
-                         "Менеджер поддержки", "Изменить пароль", "Передать права"]
+                         "Менеджер поддержки", "Кодовая команда", "Изменить пароль", "Передать права"]
     elif redactor.type == "manager":
         buttons = ["Каталог", "Информация"]
         extra_buttons = ["Рассылка для клиетов"]
@@ -378,13 +389,18 @@ def super_menu(message):
                     redactor.operation = "edit_support_manager"
                     bot.register_next_step_handler(message, super_menu)
                 elif message.text == extra_buttons[4]:
+                    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Изменить", "Назад")
+                    key_word = select_db("value", "settings", "name = 'key_word'")[0][0]
+                    bot.send_message(message.from_user.id, f"Сейчас кодовая команда : /{key_word}", reply_markup=markup)
+                    bot.register_next_step_handler(message, edit_key_word)
+                elif message.text == extra_buttons[5]:
                     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
                     bot.send_message(message.from_user.id, "Введи текущий пароль", reply_markup=markup)
                     redactor.operation, redactor.type = "password edit", select_admin("type", "admin",
                                                                                       f"user_id = {message.from_user.id}")
 
                     bot.register_next_step_handler(message, who_you)
-                elif message.text == extra_buttons[5]:
+                elif message.text == extra_buttons[6]:
                     bot.send_message(message.from_user.id,
                                      "Передать права администратора можно только зарегестрированным менеджерам!")
                     bot.send_message(message.from_user.id, "<b>ДАННОЕ ДЕЙСТВИЕ УЖЕ НЕЛЬЗЯ БУДЕТ ОТМЕНИТЬ</b>",
@@ -501,6 +517,24 @@ def super_menu(message):
 
 # для добаления менеджера
 manager_id = 0
+
+
+def update_key_word(message):
+    update_db("settings", "value", f"'{message.text}'", "name = 'key_word'")
+    bot.send_message(message.from_user.id, f"Теперь кодовая команда равно /{message.text}")
+    redactor.operation = "show"
+    super_menu(message)
+
+
+
+def edit_key_word(message):
+    if message.text == "Изменить":
+        bot.send_message(message.from_user.id, "Введи новое кодовая команда: ")
+        bot.register_next_step_handler(message, update_key_word)
+    else:
+        redactor.operation = "show"
+        super_menu(message)
+
 
 
 def edit_admin(message):
@@ -985,8 +1019,7 @@ def data(call):
             for i in basket:
                 about_product = select_db(
                     "*", "product", f"_id = {i[2]}")
-                name_parents_category_product = select_db(
-                    "title", whereis=f"_id = {about_product[0][5]}")
+                name_parents_category_product = select_db("title", "categories", whereis=f"_id = {about_product[0][5]}")
                 price = about_product[0][3] * i[3]
                 all += price
                 h = f"{i[3]} X {name_parents_category_product[0][0]} -> {about_product[0][1]}\nСтоимость: {price} ₽\n\n"
@@ -994,7 +1027,12 @@ def data(call):
             user_basket += f"<b>Всего: {all} ₽</b>"
             clients = select_db(
                 "*", "clients", whereis=f"user_id = {call.message.chat.id}")[0][2:]
-            username = "@" + clients[0]
+
+            if clients[0] == call.message.from_user.username:
+                username = "@" + clients[0]
+            else:
+                update_db("clients", "username", f"'{call.message.chat.username}'", f"user_id = {call.message.chat.id}")
+                username = "@" + call.message.chat.username
             message_order = f"<b>Ссылка на пользователя</b>: {username}\n<b>ФИО</b>: <i>{clients[1]}</i>\n<b>Город</b>: <i>{clients[3]}</i>\n<b>Адрес</b>: <i>{clients[4]}</i>\n<b>Номер телефона</b>: <i>{clients[2]}</i>\n\n<b>Заказ: </b>\n" + user_basket
 
             from manager_bot import send_order
@@ -1238,10 +1276,17 @@ def add_product(message):
                 bot.register_next_step_handler(message, add_product)
             elif product_data["do"] == "price":
                 try:
-                    product_data["price"] = int(message.text)
-                    product_data["do"] = "photo_src"
-                    bot.send_message(message.from_user.id, "Отправь фото продукта", reply_markup=markup)
-                    bot.register_next_step_handler(message, add_product)
+                    if int(message.text) >= 0:
+                        product_data["price"] = int(message.text)
+                        product_data["do"] = "photo_src"
+                        bot.send_message(message.from_user.id, "Отправь фото продукта", reply_markup=markup)
+                        bot.register_next_step_handler(message, add_product)
+                    else:
+                        product_data["do"] = "price"
+                        bot.send_message(message.from_user.id,
+                                         "Введи повторно цену продукта\n<code>Не, ну ты прикалываешься нафига она меньше нуля</code>",
+                                         reply_markup=markup, parse_mode="html")
+                        bot.register_next_step_handler(message, add_product)
                 except Exception:
                     product_data["do"] = "price"
                     bot.send_message(message.from_user.id,
@@ -1276,7 +1321,11 @@ def add_product(message):
 def add_category(message):
     if message.text != "Отмена":
         global user_road
-        insert_db("categories", None, message.text, 1, int(user_road[-1]))
+        list_category = return_list(select_db("title", "categories", f"parents_categories = {int(user_road[-1])}"))
+        if message.text not in list_category:
+            insert_db("categories", None, message.text, 1, int(user_road[-1]))
+        else:
+            bot.send_message(message.from_user.id, "Категория с таким именем уже существует")
         do_order(message)
     else:
         do_order(message)
@@ -1394,14 +1443,14 @@ def do_order(message):
                 markup.add("-" * 40)
                 markup.add("Добавить\nкатегорию", "Переименовать\nкатегорию", "Удалить\nкатегорию")
             bot.send_message(
-                message.from_user.id, "Отлично, нажимай на нужную категорию", reply_markup=markup)
+                message.from_user.id, "Нажимай на нужную категорию", reply_markup=markup)
             bot.register_next_step_handler(message, next_category)
         else:
             for i in product(user_category):
                 button_name = types.KeyboardButton(i)
                 markup.add(button_name)
             markup.add("⏺В главное меню", "< Назад")
-            text = "Отлично, выбери продукт"
+            text = "Выбери продукт"
             if redactor.type != "user":
                 markup.add("-" * 40)
                 if not product(user_category):
