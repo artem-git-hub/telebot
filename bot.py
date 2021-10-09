@@ -91,7 +91,7 @@ def cmd_start(message):
         else:
             update_db("clients", "username", f"'{message.from_user.username}'",
                       f"user_id = {message.from_user.id}")
-    text = ""
+
     if message.text == "/start" or message.text == "/restart":
         text = send_mess_start
         global messageBot
