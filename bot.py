@@ -107,10 +107,6 @@ def cmd_start(message):
 @bot.message_handler(content_types=["text"])
 def accept_message(message):
     global user_road
-    # try:
-    #     redactor.type = select_admin("type", "admin", f"user_id = {message.from_user.id}")[0][0]
-    # except sqlite3.Error:
-    #     redactor.type = "user"
     if message.from_user.id in return_list(select_admin("user_id", "admin", "")):
         if message.from_user.first_name is None:
             first_name = ""
