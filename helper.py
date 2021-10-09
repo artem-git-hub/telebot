@@ -17,9 +17,7 @@ def generate_filename():
 
 
 def generate_salt():
-    characters = """qwertyuiopasdfghjklzxcvbnm1234567890"""
-    result_str = ''.join(random.choice(characters) for el in range(20))
-    return result_str
+    return uuid.uuid4().hex
 
 
 def reg(user_id, password, type):
