@@ -1,11 +1,8 @@
-import logging
-import sys
-
-import os
 import hashlib
-
+import logging
+import os
 import sqlite3
-
+import sys
 import telebot
 from telebot import types
 
@@ -526,7 +523,6 @@ def update_key_word(message):
     super_menu(message)
 
 
-
 def edit_key_word(message):
     if message.text == "Изменить":
         bot.send_message(message.from_user.id, "Введи новое кодовая команда: ")
@@ -534,7 +530,6 @@ def edit_key_word(message):
     else:
         redactor.operation = "show"
         super_menu(message)
-
 
 
 def edit_admin(message):

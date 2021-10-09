@@ -1,6 +1,6 @@
+import hashlib
 import random
 import sqlite3
-import hashlib
 import uuid
 
 db = sqlite3.connect("db/shop.db", check_same_thread=False)
