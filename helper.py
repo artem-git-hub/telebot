@@ -1,5 +1,4 @@
 import hashlib
-import random
 import sqlite3
 import uuid
 
@@ -29,11 +28,11 @@ def reg(user_id, password, type):
 def hash_func(user_id, password="", what_do="gen"):
     user_id_byte = str(user_id)[2:7].encode("utf-8")
     if what_do == "gen":
-        # salt = os.urandom(32) # Новая соль для данного пользователя salt =
-        # b'\xf3`e\xd7\x9e\x91\x7f\x9c\x99\xec\xbe0p\xc4\xa2\x1e\xed\xc1\x0e\xe7\xb3\x18\xb9\xdd\x111\x8a\xe2I\xe3\x0c\xeb'
         salt = generate_salt()
         salt_byte = salt.encode("utf-8")
         password_gen = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt_byte, 100000).hex()
+
+         # ниже строчка тебе точно нужна? она вроде бездействует!
         user_id_gen = hashlib.pbkdf2_hmac('sha256', str(user_id).encode('utf-8'), user_id_byte, 100000).hex()
         return [user_id, salt, password_gen]
     elif what_do == "edit_pass":
@@ -80,7 +79,6 @@ def select_admin(whatis="*", fromis="admin", whereis=''):
     if whereis == "":
         curAdmin.execute("""SELECT {} FROM {};""".format(whatis, fromis))
     else:
-        # print("""SELECT {} FROM {} WHERE {};""".format(whatis, fromis, whereis))
         curAdmin.execute(
             """SELECT {} FROM {} WHERE {};""".format(whatis, fromis, whereis))
     return curAdmin.fetchall()
@@ -98,7 +96,6 @@ def select_db(whatis="*", fromis="baskets", whereis=''):
     if whereis == "":
         cursor.execute("""SELECT {} FROM {};""".format(whatis, fromis))
     else:
-        # print("""SELECT {} FROM {} WHERE {};""".format(whatis, fromis, whereis))
         cursor.execute(
             """SELECT {} FROM {} WHERE {};""".format(whatis, fromis, whereis))
     return cursor.fetchall()
