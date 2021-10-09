@@ -61,15 +61,16 @@ def cmd_start(message):
     else:
         last_name = message.from_user.last_name
     send_mess_help = "Помочь " + first_name + last_name + \
-                     "?\nНажми пожалуйста на кнопку ниже, ну или напиши : \n<code>📁 Каталог</code>"
+                     "?\nНажмите пожалуйста на кнопку ниже, или напишите : \n<code>📁 Каталог</code>"
 
     send_mess_start = "Привет " + first_name + last_name + \
-                      " 👋\nНажми пожалуйста на кнопку ниже, ну или напиши : \n<code>📁 Каталог</code>"
+                      " 👋\nНажмите пожалуйста на кнопку ниже, или напишите: \n<code>📁 Каталог</code>"
     keyboarder = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     first_button = types.KeyboardButton(text="📁 Каталог")
     second_button = types.KeyboardButton(text="🛍 Корзина")
     third_button = types.KeyboardButton(text="👩‍🦽 Профиль")
     fourth_button = types.KeyboardButton(text="📣 Информация")
+    # todo: локальная переменная fifth_button не используется! Удали её!
     fifth_button = types.KeyboardButton(text="Получить прайс лист")
     support = types.KeyboardButton(text="Поддержка")
     keyboarder.add(first_button, second_button, third_button, fourth_button, support)
@@ -79,7 +80,6 @@ def cmd_start(message):
     if message.text == "/start" or "/restart":
         user_id = str(message.chat.id)
         username = message.from_user.username
-        # reg(message.from_user.id, "1234", "admin")
         from datetime import datetime
 
         dt_created = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
@@ -91,7 +91,7 @@ def cmd_start(message):
         else:
             update_db("clients", "username", f"'{message.from_user.username}'",
                       f"user_id = {message.from_user.id}")
-    text = ""
+
     if message.text == "/start" or message.text == "/restart":
         text = send_mess_start
         global messageBot
@@ -100,17 +100,13 @@ def cmd_start(message):
         text = send_mess_help
     else:
         text = "Ну что ж продолжим"
-    bot.send_message(message.from_user.id, text + "\n\nЕсли возникнут проблемы в работе бота просто напиши /start",
+    bot.send_message(message.from_user.id, text + "\n\nЕсли возникнут проблемы в работе бота просто напишите /start",
                      reply_markup=keyboarder, parse_mode='html')
 
 
 @bot.message_handler(content_types=["text"])
 def accept_message(message):
     global user_road
-    # try:
-    #     redactor.type = select_admin("type", "admin", f"user_id = {message.from_user.id}")[0][0]
-    # except sqlite3.Error:
-    #     redactor.type = "user"
     if message.from_user.id in return_list(select_admin("user_id", "admin", "")):
         if message.from_user.first_name is None:
             first_name = ""
@@ -251,7 +247,7 @@ def who_you(message):
                         Redactor.access = "yes"
                         # авторизация для изменения пароля для администратора
                         bot.send_message(message.from_user.id,
-                                         "Введи новый пароль (ТОЛЬКО ЗАПОМНИ ЕГО!!!\nЕСЛИ УТЕРЯЕШЬ ЕГО УЖЕ НЕ ВОССТАНОВИТЬ, только при обращении к создателю бота)")
+                                         "Введите новый пароль (ТОЛЬКО ЗАПОМНИТЕ ЕГО!!!\nЕСЛИ УТЕРЯЕТЕ ЕГО УЖЕ НЕ ВОССТАНОВИТЬ, только при обращении к создателю бота)")
                         bot.register_next_step_handler(message, edit_password_admin)
                 else:
                     bot.send_message(message.from_user.id, "Не правильно")
@@ -404,7 +400,7 @@ def super_menu(message):
                                      parse_mode="html")
                     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
                     man_l = show_manager_list("yes")
-                    if man_l == None:
+                    if man_l is None:
                         man_l = ""
                     bot.send_message(message.from_user.id,
                                      "Новый администраро это - \n\nвведи число\n\n" + man_l,
@@ -560,17 +556,6 @@ def edit_admin(message):
             markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
             bot.send_message(message.from_user.id, "Введено не число (повтори): ", reply_markup=markup)
             bot.register_next_step_handler(message, edit_admin)
-
-
-# def num_keyboard(message):
-#     markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
-#     markup.add("1", "2", "3")
-#     markup.add("4", "5", "6")
-#     markup.add("7", "8", "9")
-#     markup.add("0")
-#     markup.add("Отмена")
-#     return markup
-
 
 def edit_order_manager(message):
     try:
@@ -834,9 +819,6 @@ def show_basket(message):
     elif show_product_id < minimum:
         show_product_id = max_id
 
-    # bot.send_message(message.chat.id, text=text)
-
-
 def button_basket(summ, show_product_id, basket):
     clear = types.InlineKeyboardButton(
         '✖️', callback_data='basket_clear')
@@ -1041,10 +1023,10 @@ def data(call):
                                                                   "для отправки вам кода отслеживания"),
                                    chat_id=call.message.chat.id,
                                    message_id=call.message.message_id)  # , reply_markup=markup)
+            # todo: зачем тебе строка ниже? она не несёт никакого смысла
             tablename = "user_" + str(call.message.chat.id)
             cursor.execute(f"""DELETE FROM baskets WHERE user_id={call.message.chat.id}""")
             db.commit()
-            # bot.send_message(call.message.chat.id, "Заказ оформлен, скоро с вами свяжется менеджер для отправки вам кода отслеживания")
         else:
             markup = types.ReplyKeyboardMarkup(
                 row_width=2, resize_keyboard=True)
@@ -1086,14 +1068,12 @@ def show_product(message):
     if message.text in list_for_check:
         global last_product
 
-        # last_message.append(message.message_id + 1)
         check_and_delete(message)
         last_product = message.text
 
         all_about_product = []
         for i in select_db("*", "product",
                            "title = '{}' AND id_categories = '{}'".format(message.text, user_category)):
-            # bot.send_message(message.from_user.id, "Нажимай пожалуйста на кнопки, а то я непойму =)")
             all_about_product = list(i)
         img = open(all_about_product[4], 'rb')
         id_product = return_one_value(
@@ -1132,7 +1112,6 @@ def show_product(message):
             product_data["do"] = "title"
             bot.send_message(message.from_user.id, "Введи название продукта :", reply_markup=markup)
             bot.register_next_step_handler(message, add_product)
-            # bot.register_next_step_handler(message, add_product)
         elif message.text == "Изменить\nтовар":
             markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
             markup.add("Отмена")
@@ -1368,7 +1347,6 @@ def delete_category(message):
         global user_road
         id_cat = select_db("_id", "categories", f"parents_categories = {int(user_road[-1])} AND nodelete = 1")[
             abs(int(message.text)) - 1][0]
-        # cursor.execute(f"""DELETE FROM categories where _id = {id_cat}""")
         update_db("categories", "nodelete", 0, f"_id = {id_cat}")
         do_order(message)
     except Exception as e:
