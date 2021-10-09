@@ -819,9 +819,6 @@ def show_basket(message):
     elif show_product_id < minimum:
         show_product_id = max_id
 
-    # bot.send_message(message.chat.id, text=text)
-
-
 def button_basket(summ, show_product_id, basket):
     clear = types.InlineKeyboardButton(
         '✖️', callback_data='basket_clear')
@@ -1026,10 +1023,10 @@ def data(call):
                                                                   "для отправки вам кода отслеживания"),
                                    chat_id=call.message.chat.id,
                                    message_id=call.message.message_id)  # , reply_markup=markup)
+            # todo: зачем тебе строка ниже? она не несёт никакого смысла
             tablename = "user_" + str(call.message.chat.id)
             cursor.execute(f"""DELETE FROM baskets WHERE user_id={call.message.chat.id}""")
             db.commit()
-            # bot.send_message(call.message.chat.id, "Заказ оформлен, скоро с вами свяжется менеджер для отправки вам кода отслеживания")
         else:
             markup = types.ReplyKeyboardMarkup(
                 row_width=2, resize_keyboard=True)
@@ -1071,14 +1068,12 @@ def show_product(message):
     if message.text in list_for_check:
         global last_product
 
-        # last_message.append(message.message_id + 1)
         check_and_delete(message)
         last_product = message.text
 
         all_about_product = []
         for i in select_db("*", "product",
                            "title = '{}' AND id_categories = '{}'".format(message.text, user_category)):
-            # bot.send_message(message.from_user.id, "Нажимай пожалуйста на кнопки, а то я непойму =)")
             all_about_product = list(i)
         img = open(all_about_product[4], 'rb')
         id_product = return_one_value(
@@ -1117,7 +1112,6 @@ def show_product(message):
             product_data["do"] = "title"
             bot.send_message(message.from_user.id, "Введи название продукта :", reply_markup=markup)
             bot.register_next_step_handler(message, add_product)
-            # bot.register_next_step_handler(message, add_product)
         elif message.text == "Изменить\nтовар":
             markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
             markup.add("Отмена")
@@ -1353,7 +1347,6 @@ def delete_category(message):
         global user_road
         id_cat = select_db("_id", "categories", f"parents_categories = {int(user_road[-1])} AND nodelete = 1")[
             abs(int(message.text)) - 1][0]
-        # cursor.execute(f"""DELETE FROM categories where _id = {id_cat}""")
         update_db("categories", "nodelete", 0, f"_id = {id_cat}")
         do_order(message)
     except Exception as e:
