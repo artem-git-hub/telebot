@@ -400,7 +400,7 @@ def super_menu(message):
                                      parse_mode="html")
                     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
                     man_l = show_manager_list("yes")
-                    if man_l == None:
+                    if man_l is None:
                         man_l = ""
                     bot.send_message(message.from_user.id,
                                      "Новый администраро это - \n\nвведи число\n\n" + man_l,
