@@ -68,7 +68,7 @@ def cmd_start(message):
     keyboarder = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     first_button = types.KeyboardButton(text="📁 Каталог")
     second_button = types.KeyboardButton(text="🛍 Корзина")
-    third_button = types.KeyboardButton(text="👩‍🦽 Профиль")
+    third_button = types.KeyboardButton(text="👤 Профиль")
     fourth_button = types.KeyboardButton(text="📣 Информация")
     # todo: локальная переменная fifth_button не используется! Удали её!
     fifth_button = types.KeyboardButton(text="Получить прайс лист")
@@ -164,7 +164,7 @@ def accept_message(message):
         do_order(message)
     elif message.text == "🛍 Корзина":
         show_basket(message)
-    elif message.text == "👩‍🦽 Профиль" or message.text == "Заполнить профиль":
+    elif message.text == "👤 Профиль" or message.text == "Заполнить профиль":
         show_profile(message)
     elif message.text == "Редактировать профиль":
         edit_profile(message)
@@ -328,7 +328,11 @@ def super_menu(message):
                     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Добавить менеджера",
                                                                                               "Удалить менеджера",
                                                                                               "Назад")
-                    bot.send_message(message.from_user.id, show_manager_list(), reply_markup=markup, parse_mode="html")
+                    if show_manager_list():
+                        list_manager = show_manager_list()
+                    else:
+                        list_manager = "Менеджеры отсутствуют"
+                    bot.send_message(message.from_user.id, list_manager, reply_markup=markup, parse_mode="html")
                     bot.register_next_step_handler(message, edit_managers)
                 elif message.text == buttons[3]:
 
@@ -356,11 +360,15 @@ def super_menu(message):
                     bot.send_message(message.from_user.id, "Введи сообщение для менеджеров бота: ", reply_markup=markup)
                     bot.register_next_step_handler(message, send_msg_manager)
                 elif message.text == extra_buttons[2]:
-                    try:
+                    if select_db("value", "settings", "name = 'order'")[0] != ('',):
                         manager_id_order = select_db("value", "settings", "name = 'order'")[0][0]
-                    except IndexError:
-                        manager_id_order = select_admin("user_id", "admin", f"type = 'manager'")[0][0]
-                        update_db("settings", "value", f"'{manager_id_order}'", f"name = 'order'")
+                    else:
+                        try:
+                            manager_id_order = select_admin("user_id", "admin", f"type = 'manager'")[0][0]
+                            update_db("settings", "value", f"'{manager_id_order}'", f"name = 'order'")
+                        except IndexError:
+                            manager_id_order = select_admin("user_id", "admin", "")[0][0]
+                            update_db("settings", "value", f"'{manager_id_order}'", f"name = 'order'")
                     manager = select_admin("username, name", "admin", f"user_id = {manager_id_order}")[0]
                     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Изменить", "Назад")
                     about_manager = f"Username: @{manager[0]}\nИмя в ТГ: {manager[1]}"
@@ -369,11 +377,16 @@ def super_menu(message):
                     Redactor.operation = "edit_order_manager"
                     bot.register_next_step_handler(message, super_menu)
                 elif message.text == extra_buttons[3]:
-                    try:
+                    if select_db("value", "settings", "name = 'support'")[0] != ('',):
                         manager_id_support = select_db("value", "settings", "name = 'support'")[0][0]
-                    except IndexError:
-                        manager_id_support = select_admin("user_id", "admin", f"type = 'manager'")[0][0]
-                        update_db("settings", "value", f"'{manager_id_support}'", f"name = 'support'")
+                    else:
+                        try:
+                            manager_id_support = select_admin("user_id", "admin", f"type = 'manager'")[0][0]
+                            print("sdfasdfas")
+                            update_db("settings", "value", f"'{manager_id_support}'", f"name = 'support'")
+                        except IndexError:
+                            manager_id_support = select_admin("user_id", "admin", "")[0][0]
+                            update_db("settings", "value", f"'{manager_id_support}'", f"name = 'support'")
                     manager = select_admin("username, name", "admin", f"user_id = {manager_id_support}")[0]
                     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Изменить", "Назад")
                     about_manager = f"Username: @{manager[0]}\nИмя в ТГ: {manager[1]}"
@@ -411,21 +424,33 @@ def super_menu(message):
             super_menu(message)
     elif Redactor.operation == "edit_order_manager":
         if message.text == "Изменить":
-            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
-            bot.send_message(message.from_user.id,
-                             "Кто теперь будет менеджером по заказом\n\nвведи число\n\n" + show_manager_list("yes"),
-                             reply_markup=markup, parse_mode="html")
-            bot.register_next_step_handler(message, edit_order_manager)
+            try:
+                markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
+                bot.send_message(message.from_user.id,
+                                 "Кто теперь будет менеджером по заказом\n\nвведи число\n\n" + show_manager_list("yes"),
+                                 reply_markup=markup, parse_mode="html")
+                bot.register_next_step_handler(message, edit_order_manager)
+            except TypeError:
+                bot.send_message(message.from_user.id,
+                                 "Мне показалось или нет ни одного менеджера ещё\nДобавь его", parse_mode="html")
+                Redactor.operation = "show"
+                super_menu(message)
         else:
             Redactor.operation = "extra_edit"
             super_menu(message)
     elif Redactor.operation == "edit_support_manager":
         if message.text == "Изменить":
-            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
-            bot.send_message(message.from_user.id,
-                             "Кто теперь будет менеджером поддержки\n\nвведи число\n\n" + show_manager_list("yes"),
-                             reply_markup=markup, parse_mode="html")
-            bot.register_next_step_handler(message, edit_support_manager)
+            try:
+                markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
+                bot.send_message(message.from_user.id,
+                                 "Кто теперь будет менеджером поддержки\n\nвведи число\n\n" + show_manager_list("yes"),
+                                 reply_markup=markup, parse_mode="html")
+                bot.register_next_step_handler(message, edit_support_manager)
+            except TypeError:
+                bot.send_message(message.from_user.id,
+                                 "Мне показалось или нет ни одного менеджера ещё\nДобавь его", parse_mode="html")
+                Redactor.operation = "show"
+                super_menu(message)
         else:
             Redactor.operation = "extra_edit"
             super_menu(message)
@@ -690,7 +715,7 @@ def send_msg_clients(message):
         keyboarder = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
         first_button = types.KeyboardButton(text="📁 Каталог")
         second_button = types.KeyboardButton(text="🛍 Корзина")
-        third_button = types.KeyboardButton(text="👩‍🦽 Профиль")
+        third_button = types.KeyboardButton(text="👤 Профиль")
         fourth_button = types.KeyboardButton(text="📣 Информация")
         keyboarder.add(first_button, second_button, third_button, fourth_button)
         for i in clients_ids:
@@ -735,14 +760,14 @@ def edit_profile(message):
         bot.send_message(
             message.chat.id, dictionary[message.text][0], reply_markup=markup)
         bot.register_next_step_handler(message, edit_cat_profile)
-    elif message.text == "👩‍🦽 Профиль":
+    elif message.text == "👤 Профиль":
         show_profile(message)
     else:
         show_profile(message)
         markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
         for i in buttons:
             markup.add(types.KeyboardButton(text=i[0]), types.KeyboardButton(text=i[1]))
-        markup.add("👩‍🦽 Профиль")
+        markup.add("👤 Профиль")
         bot.send_message(message.chat.id, "Выберете что изменить",
                          parse_mode="html", reply_markup=markup)
         bot.register_next_step_handler(message, edit_profile)

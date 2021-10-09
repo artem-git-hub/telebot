@@ -77,6 +77,7 @@ def product(user_category):
 
 def select_admin(whatis="*", fromis="admin", whereis=''):
     if whereis == "":
+        # print("""SELECT {} FROM {};""".format(whatis, fromis))
         curAdmin.execute("""SELECT {} FROM {};""".format(whatis, fromis))
     else:
         curAdmin.execute(
