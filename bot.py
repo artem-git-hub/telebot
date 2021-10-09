@@ -70,7 +70,7 @@ def cmd_start(message):
     second_button = types.KeyboardButton(text="🛍 Корзина")
     third_button = types.KeyboardButton(text="👩‍🦽 Профиль")
     fourth_button = types.KeyboardButton(text="📣 Информация")
-    # todo: fifth_button - тебе точно нужна? может быть удалишь её?
+    # todo: локальная переменная fifth_button не используется! Удали её!
     fifth_button = types.KeyboardButton(text="Получить прайс лист")
     support = types.KeyboardButton(text="Поддержка")
     keyboarder.add(first_button, second_button, third_button, fourth_button, support)
