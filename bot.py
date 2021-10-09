@@ -70,6 +70,7 @@ def cmd_start(message):
     second_button = types.KeyboardButton(text="🛍 Корзина")
     third_button = types.KeyboardButton(text="👩‍🦽 Профиль")
     fourth_button = types.KeyboardButton(text="📣 Информация")
+    # fifth_button - тебе точно нужна? может быть удалишь её?
     fifth_button = types.KeyboardButton(text="Получить прайс лист")
     support = types.KeyboardButton(text="Поддержка")
     keyboarder.add(first_button, second_button, third_button, fourth_button, support)
@@ -79,7 +80,6 @@ def cmd_start(message):
     if message.text == "/start" or "/restart":
         user_id = str(message.chat.id)
         username = message.from_user.username
-        # reg(message.from_user.id, "1234", "admin")
         from datetime import datetime
 
         dt_created = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
