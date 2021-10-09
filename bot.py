@@ -61,10 +61,10 @@ def cmd_start(message):
     else:
         last_name = message.from_user.last_name
     send_mess_help = "Помочь " + first_name + last_name + \
-                     "?\nНажми пожалуйста на кнопку ниже, ну или напиши : \n<code>📁 Каталог</code>"
+                     "?\nНажмите пожалуйста на кнопку ниже, или напишите : \n<code>📁 Каталог</code>"
 
     send_mess_start = "Привет " + first_name + last_name + \
-                      " 👋\nНажми пожалуйста на кнопку ниже, ну или напиши : \n<code>📁 Каталог</code>"
+                      " 👋\nНажмите пожалуйста на кнопку ниже, или напишите: \n<code>📁 Каталог</code>"
     keyboarder = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     first_button = types.KeyboardButton(text="📁 Каталог")
     second_button = types.KeyboardButton(text="🛍 Корзина")
@@ -100,7 +100,7 @@ def cmd_start(message):
         text = send_mess_help
     else:
         text = "Ну что ж продолжим"
-    bot.send_message(message.from_user.id, text + "\n\nЕсли возникнут проблемы в работе бота просто напиши /start",
+    bot.send_message(message.from_user.id, text + "\n\nЕсли возникнут проблемы в работе бота просто напишите /start",
                      reply_markup=keyboarder, parse_mode='html')
 
 
