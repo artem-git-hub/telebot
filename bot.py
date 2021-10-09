@@ -70,7 +70,7 @@ def cmd_start(message):
     second_button = types.KeyboardButton(text="🛍 Корзина")
     third_button = types.KeyboardButton(text="👩‍🦽 Профиль")
     fourth_button = types.KeyboardButton(text="📣 Информация")
-    # fifth_button - тебе точно нужна? может быть удалишь её?
+    # todo: fifth_button - тебе точно нужна? может быть удалишь её?
     fifth_button = types.KeyboardButton(text="Получить прайс лист")
     support = types.KeyboardButton(text="Поддержка")
     keyboarder.add(first_button, second_button, third_button, fourth_button, support)
@@ -556,17 +556,6 @@ def edit_admin(message):
             markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
             bot.send_message(message.from_user.id, "Введено не число (повтори): ", reply_markup=markup)
             bot.register_next_step_handler(message, edit_admin)
-
-
-# def num_keyboard(message):
-#     markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
-#     markup.add("1", "2", "3")
-#     markup.add("4", "5", "6")
-#     markup.add("7", "8", "9")
-#     markup.add("0")
-#     markup.add("Отмена")
-#     return markup
-
 
 def edit_order_manager(message):
     try:
