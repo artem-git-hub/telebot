@@ -247,7 +247,7 @@ def who_you(message):
                         Redactor.access = "yes"
                         # авторизация для изменения пароля для администратора
                         bot.send_message(message.from_user.id,
-                                         "Введи новый пароль (ТОЛЬКО ЗАПОМНИ ЕГО!!!\nЕСЛИ УТЕРЯЕШЬ ЕГО УЖЕ НЕ ВОССТАНОВИТЬ, только при обращении к создателю бота)")
+                                         "Введите новый пароль (ТОЛЬКО ЗАПОМНИТЕ ЕГО!!!\nЕСЛИ УТЕРЯЕТЕ ЕГО УЖЕ НЕ ВОССТАНОВИТЬ, только при обращении к создателю бота)")
                         bot.register_next_step_handler(message, edit_password_admin)
                 else:
                     bot.send_message(message.from_user.id, "Не правильно")
