@@ -5,7 +5,9 @@ import sqlite3
 import sys
 import telebot
 from telebot import types
+import threading
 
+lock = threading.Lock()
 from config import TOKEN
 from helper import select_admin, sum_element_in_list, return_one_value, insert_db, update_db, categories, \
     product, select_db, generate_filename, hash_func, reg, return_list, update_admin
@@ -275,7 +277,9 @@ def edit_password_admin(message):
 def super_menu(message):
     buttons = []
     extra_buttons = []
-    Redactor.type = select_admin("type", "admin", f"user_id = {message.from_user.id}")[0][0]
+    print(Redactor.operation)
+    with lock:
+        Redactor.type = select_admin("type", "admin", f"user_id = {message.from_user.id}")[0][0]
     if Redactor.type == "admin":
         buttons = ["Каталог", "Информация", "Менеджеры"]
         extra_buttons = ["Рассылка для клиетов", "Рассылка для менеджеров", "Менеджер для заказов",
@@ -515,20 +519,17 @@ def super_menu(message):
     elif Redactor.operation == "get_password_maneger":
         if Redactor.type == "admin":
             if message.text != "Отмена":
+                # global manager_id
                 reg(manager_id, message.text, "manager")
                 list_clients = select_db("user_id, username", "clients", "")
+                print(list_clients)
                 for i in list_clients:
                     if i[0] == manager_id:
-                        update_admin("admin", "username", f'"{i[1]}"', f"user_id = {manager_id}")
+                        print(i[0], manager_id, i[1])
+                #         update_admin("admin", "username", f'"{i[1]}"', f"user_id = {manager_id}")
                 bot.send_message(message.from_user.id, show_manager_list()[:-2], parse_mode="html")
-                Redactor.operation = "show"
-                super_menu(message)
-            else:
-                Redactor.operation = "show"
-                super_menu(message)
-        else:
-            Redactor.operation = "show"
-            super_menu(message)
+        Redactor.operation = "show"
+        super_menu(message)
     else:
         cmd_start(message)
 
@@ -570,7 +571,7 @@ def edit_admin(message):
         else:
             markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
             bot.send_message(message.from_user.id,
-                             f"Перебор с индексом:\nЗначение от 0 до {len(list_manager) + 1}, а у тебя {id_manager_in_list}",
+                             f"Перебор с индексом:\nЗначение от 0 до {len(list_manager)}, а у тебя {id_manager_in_list}",
                              reply_markup=markup)
             bot.register_next_step_handler(message, edit_admin)
     except ValueError:
@@ -581,6 +582,7 @@ def edit_admin(message):
             markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1).add("Отмена")
             bot.send_message(message.from_user.id, "Введено не число (повтори): ", reply_markup=markup)
             bot.register_next_step_handler(message, edit_admin)
+
 
 def edit_order_manager(message):
     try:
@@ -646,7 +648,13 @@ def edit_managers(message):
     if message.text == "Добавить менеджера":
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         markup.add("Отмена")
-        bot.send_message(message.from_user.id, show_manager_list()[:-2], parse_mode="html")
+        try:
+            bot.send_message(message.from_user.id, show_manager_list()[:-2], parse_mode="html")
+        except TypeError:
+            bot.send_message(message.from_user.id,
+                             "Мне показалось или нет ни одного менеджера ещё\nДобавь его", parse_mode="html")
+            Redactor.operation = "show"
+            super_menu(message)
         bot.send_message(message.from_user.id,
                          "Чтобы добавить менеджера выполните следующие шаги :\n\n1) Будущий менеджер должен получить свой id\n(это можно введя /getid этому боту)\n\n2) Отправте мне этот id\n\n3) Задайте пароль этому менеджеру\n\n4) Передайте пароль менеджеру")
         bot.send_message(message.from_user.id, "Введите id будущего менеджера", reply_markup=markup)
@@ -693,7 +701,6 @@ def show_manager_list(with_number=""):
                 name = "<b>скоро узнаем</b>"
             _str = f"Имя: <code>{name}</code>\nUsername: {uname}\nTG id: <code>{i[0]}</code>\n\n"
             send += _str
-            return send
     elif with_number == "yes":
         for i in list_manager:
             if i[1] != None:
@@ -706,7 +713,7 @@ def show_manager_list(with_number=""):
                 name = "<b>скоро узнаем</b>"
             _str = f"- {list_manager.index(i) + 1} -\nИмя: <code>{name}</code>\nUsername: {uname}\nTG id: <code>{i[0]}</code>\n\n"
             send += _str
-            return send
+    return send
 
 
 def send_msg_clients(message):
@@ -844,6 +851,7 @@ def show_basket(message):
     elif show_product_id < minimum:
         show_product_id = max_id
 
+
 def button_basket(summ, show_product_id, basket):
     clear = types.InlineKeyboardButton(
         '✖️', callback_data='basket_clear')
@@ -880,8 +888,11 @@ try:
                 id_product = return_one_value(
                     select_db("_id", "product",
                               "title = '{}' AND id_categories = '{}'".format(title, id_parents_categories)))
-            select_amount = return_one_value(
-                select_db("amount", "baskets", f"""product_id = {id_product} AND user_id = {user_id}"""))
+            if id_product:
+                select_amount = return_one_value(
+                    select_db("amount", "baskets", f"""product_id = {id_product} AND user_id = {user_id}"""))
+            else:
+                return
             if id_product:
                 if select_amount is None:
                     insert_db("baskets", None, user_id, id_product, 1)
